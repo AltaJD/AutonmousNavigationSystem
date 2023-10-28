@@ -1,0 +1,22 @@
+0. Installation of Microsoft Build Tools: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+1. Installation of Python 3.6
+2. git clone https://github.com/abhiojha8/3D-Motion-Planning.git
+3. One more module is required: Udecidrone
+CLI: pip install git+https://github.com/udacity/udacidrone.git
+4. Install packages: "future", "msgpack", "matplotlib"
+
+
+Notes:
+If you encounter an error about installing lxml, download the required lxml library from "https://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml" and then run the following command:
+
+For Python3.10: `pip install lxml‑4.9.0‑cp310‑cp310‑win_amd64.whl`
+For Python3.11: `pip install lxml-4.9.0-cp311-cp311-win_amd64.whl`
+
+
+it was suggested to use python 3.8 instead to acquire correct lxml version:
+https://github.com/janeczku/calibre-web/issues/2606
+
+
+Alternative solution:
+
+https://github.com/mit-acl/faster
