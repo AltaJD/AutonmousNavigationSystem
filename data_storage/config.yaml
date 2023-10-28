@@ -1,0 +1,7 @@
+initial_position: (25, 100)
+final_position: (650, 530)
+
+wheelchair_length: 0.7 # 70 cm
+wheelchair_width: 0.3 # 30 cm
+
+safety_distance: 0 # how close the wheelchair can approach obstacles

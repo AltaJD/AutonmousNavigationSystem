@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.morphology import medial_axis
 from skimage.util import invert
-from planning import Action, valid_actions
+from behavioral_model import Action, valid_actions
 import time
 from typing import List
 from queue import PriorityQueue
@@ -140,7 +140,7 @@ def get_path(grid, start, goal):
     return path
 
 
-def get_custom_map(filename: str):
+def get_custom_map(filename: str, safety_distance=0):
     """=== Function consider the Start and Goal position of North and East coordinates ===
     Start = Goal = (North, East)
     """
@@ -151,7 +151,6 @@ def get_custom_map(filename: str):
 
     # Static drone altitude (meters)
     # drone_altitude = 5
-    safety_distance = 0.1
 
     grid, north_offset, east_offset = create_grid(data, safety_distance)
     print("North offset = {0}, east offset = {1}".format(north_offset, east_offset))
@@ -191,43 +190,3 @@ def reformat_path(path: list, n_set, e_set):
         new_coordinate = [new_n, new_e]
         waypoints.append(new_coordinate)
     return waypoints
-
-
-# def test(grid, skeleton, start_ne, goal_ne):
-#     # FIXME
-#
-#     skel_start, skel_goal = find_start_goal(skeleton, start_ne, goal_ne)
-#
-#     print(start_ne, goal_ne)
-#     print(skel_start, skel_goal)
-#
-#     # the above statement prints:
-#     # (25, 100) (650, 500)
-#     # [25 90] [649 500]
-#
-#     # Run A* on the skeleton
-#     skeleton_int = invert(skeleton).astype(np.int)
-#     path, cost = a_star(grid, heuristic_func, tuple(skel_start), tuple(skel_goal))
-#     print("Path length = {0}, path cost = {1}".format(len(path), cost))
-#     # the above statement prints:
-#     # Found a path.
-#     # Path length = 675, path cost = 241266.79856747386
-#
-#     plt.imshow(grid, cmap='Greys', origin='lower')
-#     plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
-#     # For the purposes of the visual the east coordinate lay along
-#     # the x-axis and the north coordinates long the y-axis.
-#     plt.plot(start_ne[1], start_ne[0], 'x')
-#     plt.plot(goal_ne[1], goal_ne[0], 'x')
-#
-#     pp = reformat_path(path, start_ne[0], start_ne[1])
-#     pprint(pp)
-#     pp = np.array(pp)
-#     print(pp)
-#     plt.plot(pp[:, 1], pp[:, 0], 'g')
-#     # pp2 = np.array(path2)
-#     # plt.plot(pp2[:, 1], pp2[:, 0], 'r')
-#
-#     plt.xlabel('EAST')
-#     plt.ylabel('NORTH')
-#     plt.show()
