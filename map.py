@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.morphology import medial_axis
 from skimage.util import invert
-from behavioral_model import Action, valid_actions
+from behavioral_model import Action
 import time
 from typing import List
 from queue import PriorityQueue
@@ -21,6 +21,26 @@ def valid_destination(grid: np.array, start: tuple, goal: tuple) -> bool:
         print(f'INVALID goal position. {grid[goal[0], goal[1]]}', file=sys.stderr)
         return False
     return True
+
+
+def valid_actions(grid, current_node):
+    """
+    Returns a list of valid_actions actions given a grid and current node.
+    """
+    valid = [Action.UP, Action.LEFT, Action.RIGHT, Action.DOWN]
+    n, m = grid.shape[0] - 1, grid.shape[1] - 1 # max is 921, 921
+    x, y = current_node
+    # check if the node is off the grid or
+    # it's an obstacle
+    if x - 1 < 0 or grid[x-1, y] == 1:
+        valid.remove(Action.UP)
+    if x + 1 > n or grid[x+1, y] == 1:
+        valid.remove(Action.DOWN)
+    if y - 1 < 0 or grid[x, y-1] == 1:
+        valid.remove(Action.LEFT)
+    if y + 1 > m or grid[x, y+1] == 1:
+        valid.remove(Action.RIGHT)
+    return valid
 
 
 def normalized_grid(grid: np.array) -> None:
