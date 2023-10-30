@@ -1,7 +1,10 @@
-initial_position: (25, 100)
-final_position: (650, 530)
+initial_position: [25, 100] # default position for testing
+final_position: [650, 530] # default position for testing
 
 wheelchair_length: 0.7 # 70 cm
 wheelchair_width: 0.3 # 30 cm
 
 safety_distance: 0 # how close the wheelchair can approach obstacles
+
+colliders: 'data_storage/colliders.csv'
+grid_save: 'data_storage/grid.csv'
