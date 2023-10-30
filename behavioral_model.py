@@ -1,5 +1,5 @@
 from enum import Enum
-
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import Optional
@@ -65,10 +65,24 @@ class IntelligentWheelchair:
         to determine the rotation angle required and
         """
         # TODO: write a method
+        rotation = self.rotation_angle(next_node=next_node)
+        self.current_position = next_node
+        print(f'Wheelchair moved to: {next_node}')
         pass
 
     def stop(self) -> None:
         pass
+
+    """The functions accessible only for calculation"""
+    def rotation_angle(self, next_node: tuple) -> float:
+        """ The function calculate the angle for rotation the wheelchair
+        It is based on the arctan between two points
+        """
+        y_diff = next_node[1]-self.current_position[1]
+        x_diff = next_node[0]-self.current_position[0]
+        angle = math.atan2(y_diff, x_diff)
+        print(f'Rotation angle is {angle}')
+        return angle
 
 
 class Action(Enum):
@@ -78,6 +92,9 @@ class Action(Enum):
     The first 2 values are the delta of the action relative
     to the current grid position. The third and final value
     is the cost of performing the action.
+
+    The rotation cost is higher, because the system also should consider whether
+    more straight and simpli path can be chosen.
     """
     LEFT = (0, -1, 1)
     RIGHT = (0, 1, 1)

@@ -6,5 +6,6 @@ wheelchair_width: 0.3 # 30 cm
 
 safety_distance: 0 # how close the wheelchair can approach obstacles
 
-colliders: 'data_storage/colliders.csv'
-grid_save: 'data_storage/grid.csv'
+colliders: './data_storage/colliders.csv'
+grid_save: './data_storage/grid.csv'
+skeleton_save: './data_storage/skeleton.csv'

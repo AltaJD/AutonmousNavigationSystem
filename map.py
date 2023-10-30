@@ -10,8 +10,6 @@ from tqdm import tqdm
 import csv
 import sys
 
-"""===Added functions === """
-
 
 def valid_destination(grid: np.array, start: tuple, goal: tuple) -> bool:
     if grid[start[0], start[1]] != 0:
@@ -43,23 +41,29 @@ def valid_actions(grid, current_node):
     return valid
 
 
-def normalized_grid(grid: np.array) -> None:
+def normalize_grid(grid: np.array) -> None:
     now_time = time.time()
+    # contrary, if the grid consists of the height of obstacles, we may consider height above threshold as an obstacle
+    threshold: int = 0
     progress_bar = tqdm(total=len(grid)*len(grid[0]))
     for i in range(len(grid)):
         for j in range(len(grid[i])):
             progress_bar.update()
-            if grid[i, j] > 0:
+            if grid[i, j] > threshold:
                 grid[i, j] = 1 # 1 indicates the existence of the unavoidable static obstacle
+            else:
+                grid[i, j] = 0
     time_diff = time.time()-now_time
     progress_bar.close()
     print('='*5+f'Normalization time: {time_diff}'+'='*5)
 
 
-def save_grid(grid_filename, grid: List) -> None:
+def save_grid(grid_filename, grid: np.array) -> None:
     with open(grid_filename,'w+') as file:
-      wr = csv.writer(file) #, quoting=csv.QUOTE_ALL)
-      wr.writerows(grid)
+        wr = csv.writer(file) #, quoting=csv.QUOTE_ALL)
+        wr.writerows(grid)
+        file.close()
+    print(f'GRID HAS BEEN SAVED TO {grid_filename}')
 
 
 def create_grid(data, safe_distance):
@@ -111,6 +115,7 @@ def a_star(grid, h, start, goal):
 
     branch = {}
     found = False
+    # TODO: add animation for path calculation
 
     while not queue.empty():
         item = queue.get()
@@ -160,18 +165,13 @@ def get_path(grid, start, goal):
     return path
 
 
-def get_custom_map(filename: str, safety_distance=0):
+def create_custom_map(filename: str, safety_distance=0):
     """=== Function consider the Start and Goal position of North and East coordinates ===
     Start = Goal = (North, East)
     """
     plt.rcParams['figure.figsize'] = 12, 12
-
     # getting obstacle data
     data = np.loadtxt(filename, delimiter=',', dtype='Float64', skiprows=2)
-
-    # Static drone altitude (meters)
-    # drone_altitude = 5
-
     grid, north_offset, east_offset = create_grid(data, safety_distance)
     print("North offset = {0}, east offset = {1}".format(north_offset, east_offset))
 
@@ -182,7 +182,7 @@ def get_custom_map(filename: str, safety_distance=0):
 def show_map(grid, skeleton, start, goal, path=None):
     # plot the edges on top of the grid along with start and goal locations
     plt.imshow(grid, origin='lower')
-    # plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+    plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
 
     if path is not None:
         pp = np.array(path)
@@ -196,17 +196,31 @@ def show_map(grid, skeleton, start, goal, path=None):
     plt.show()
 
 
-"""=== Modified code ==="""
-
-
 def reformat_path(path: list, n_set, e_set):
+    """ The path represented in the form of Action objects are converted to
+    the list of waypoint with x,y coordinates.
+    This approach significantly simplify path visualization
+    """
+    time_started = time.time()
     waypoints = []
     new_n = n_set
     new_e = e_set
+    progress_bar = tqdm(total=len(path))
     for i in range(len(path)):
         p = path[i].value
         new_n += p[0]
         new_e += p[1]
         new_coordinate = [new_n, new_e]
         waypoints.append(new_coordinate)
+        progress_bar.update(n=1)
+    progress_bar.close()
+    print('='*5+f'Path reformation: {time.time()-time_started}'+'='*5)
     return waypoints
+
+
+def read_grid(file_path, dtype) -> np.array:
+    """ The function is reading the csv file to download 2D matrix
+    This can be used for testing different normalizations and format of the maps
+    """
+    data = np.loadtxt(file_path, delimiter=',', dtype=dtype)
+    return data
