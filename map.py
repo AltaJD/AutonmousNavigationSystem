@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from skimage.morphology import medial_axis
 from skimage.util import invert
 from behavioral_model import Action
@@ -154,15 +155,20 @@ def a_star(grid, h, start, goal):
     return path[::-1], path_cost
 
 
-def get_path(grid, start, goal):
+def get_path(grid, start, goal) -> np.array:
     start_time = time.time()
-    path = a_star(grid=grid, h=heuristic_func, start=start, goal=goal)
+    path, waypoints = a_star(grid=grid, h=heuristic_func, start=start, goal=goal)
     # path = path_prune(path, collinear_points)
     # path = path_simplify(grid=grid, path=path)
     time_taken = time.time() - start_time
     time_taken = round(time_taken, 2) # round to the 2 digits after comma
+    if len(path) == 0:
+        print('Path was not found.', file=sys.stderr)
+        raise Exception
+    path = reformat_path(path, start[0], start[1])
+    path_array = np.array(path)
     print("--- %s seconds ---" % time_taken)
-    return path
+    return path_array
 
 
 def create_custom_map(filename: str, safety_distance=0):
@@ -177,23 +183,6 @@ def create_custom_map(filename: str, safety_distance=0):
 
     skeleton, distances = medial_axis(invert(grid), return_distance=True)
     return grid, skeleton, distances, data
-
-
-def show_map(grid, skeleton, start, goal, path=None):
-    # plot the edges on top of the grid along with start and goal locations
-    plt.imshow(grid, origin='lower')
-    plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
-
-    if path is not None:
-        pp = np.array(path)
-        plt.plot(pp[:, 1], pp[:, 0], 'g')
-
-    plt.plot(start[1], start[0], 'rx')
-    plt.plot(goal[1], goal[0], 'rx')
-
-    plt.xlabel('EAST')
-    plt.ylabel('NORTH')
-    plt.show()
 
 
 def reformat_path(path: list, n_set, e_set):
@@ -214,7 +203,7 @@ def reformat_path(path: list, n_set, e_set):
         waypoints.append(new_coordinate)
         progress_bar.update(n=1)
     progress_bar.close()
-    print('='*5+f'Path reformation: {time.time()-time_started}'+'='*5)
+    print('='*5+f'Path reformat: {time.time()-time_started} sec'+'='*5)
     return waypoints
 
 
@@ -224,3 +213,99 @@ def read_grid(file_path, dtype) -> np.array:
     """
     data = np.loadtxt(file_path, delimiter=',', dtype=dtype)
     return data
+
+
+"""=== Movement animation ==="""
+
+
+def show_map(grid, skeleton, start=None, goal=None, path=None, save_path=None):
+    # plot the edges on top of the grid along with start and goal locations
+    plt.imshow(grid, origin='lower')
+    plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+
+    if path is not None:
+        pp = np.array(path)
+        plt.plot(pp[:, 1], pp[:, 0], 'g')
+
+    if start is not None:
+        plt.plot(start[1], start[0], 'rx')
+    if goal is not None:
+        plt.plot(goal[1], goal[0], 'rx')
+
+    plt.xlabel('EAST')
+    plt.ylabel('NORTH')
+    if save_path is not None:
+        plt.savefig(save_path)
+    plt.show()
+
+
+def animate_path(path: np.array,
+                 grid: np.array,
+                 skeleton: np.array,
+                 start=None, goal=None,
+                 animation_speed=10,
+                 save=False) -> None:
+    """ The function is showing the figure with animated path
+    The path is represented as a list of waypoints and coordinates on the map
+    """
+    # Set up the figure and axis
+    fig, ax = plt.subplots()
+    """ Start from the starting coordinate """
+    # ax.set_xlim(np.min(path[:, 0]), np.max(path[:, 0]))
+    # ax.set_ylim(np.min(path[:, 1]), np.max(path[:, 1]))
+    """ Center according to the grid """
+    ax.set_xlim(0, grid.shape[0])
+    ax.set_ylim(0, grid.shape[1])
+    line, = ax.plot([], [], marker='o')
+
+    if start is not None:
+        ax.plot(start[1], start[0], 'rx')
+    if goal is not None:
+        ax.plot(goal[1], goal[0], 'rx')
+
+    # Plot the grid
+    ax.imshow(grid, origin='lower')
+    ax.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+
+    # Define the update function
+    def update(frame):
+        y = path[:frame+1, 0]
+        x = path[:frame+1, 1]
+        line.set_data(x, y)
+        return line,
+
+    # Create the animation object
+    num_frames = path.shape[0]
+    anim = animation.FuncAnimation(fig, update, frames=num_frames, interval=animation_speed, blit=True)
+
+    # Display the animation
+    plt.show()
+
+    # save the animation as gif
+    if save:
+        anim = animation.FuncAnimation(fig, update, frames=200, interval=10, blit=True)
+        writergif = animation.PillowWriter(fps=30)
+        anim.save('data_storage/images/path_following.gif', writer=writergif)
+        print('='*5+f'ANIMATED PATH HAS BEEN SAVED'+'='*5)
+
+
+def select_point(grid: np.array, skeleton: np.array):
+    # Display the figure
+    fig, ax = plt.subplots()
+    ax.set_xlim(0, grid.shape[1])
+    ax.set_ylim(0, grid.shape[0])
+    # Plot the grid
+    ax.imshow(grid, origin='lower')
+    ax.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+    # Show
+    plt.show(block=False)
+
+    # Wait for the user to click on the figure
+    points = plt.ginput(n=1, timeout=-1)
+
+    # Close the figure
+    plt.close(fig)
+
+    # convert to the proper format
+    location = (round(points[0][1]), round(points[0][0]))
+    return location

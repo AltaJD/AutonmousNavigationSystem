@@ -9,3 +9,4 @@ safety_distance: 0 # how close the wheelchair can approach obstacles
 colliders: './data_storage/colliders.csv'
 grid_save: './data_storage/grid.csv'
 skeleton_save: './data_storage/skeleton.csv'
+path_save: 'data_storage/path.csv'
