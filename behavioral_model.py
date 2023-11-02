@@ -35,10 +35,11 @@ class IntelligentWheelchair:
     length: float
     width: float
     height: Optional[float]
+    battery_level: float
     status: WheelchairStatus
 
     def __init__(self, current_position: tuple, current_angle: float):
-        """ Set some of the values by default, such as status of the wheelchair
+        """ Set the values by default, such as status of the wheelchair
         The position vector is essential to determine the next maneuver to be correctly calculated
         """
         self.status = WheelchairStatus.IDLE
@@ -64,7 +65,6 @@ class IntelligentWheelchair:
         """ The function is calculating the current position and vector
         to determine the rotation angle required and
         """
-        # TODO: write a method
         rotation = self.rotation_angle(next_node=next_node)
         self.current_position = next_node
         print(f'Wheelchair moved to: {next_node}')

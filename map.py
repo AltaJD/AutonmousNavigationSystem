@@ -116,7 +116,6 @@ def a_star(grid, h, start, goal):
 
     branch = {}
     found = False
-    # TODO: add animation for path calculation
 
     while not queue.empty():
         item = queue.get()
@@ -153,6 +152,14 @@ def a_star(grid, h, start, goal):
         path.append(branch[n][2])
 
     return path[::-1], path_cost
+
+
+def smooth_path(path: np.array, grid: np.array) -> np.array:
+    """
+    The absolute path from A* may include many rotations. To simplify the movement, we need to determine
+    more simple and intuitive path for the user
+    """
+    return path
 
 
 def get_path(grid, start, goal) -> np.array:
@@ -236,24 +243,24 @@ def show_map(grid, skeleton, start=None, goal=None, path=None, save_path=None):
     plt.ylabel('NORTH')
     if save_path is not None:
         plt.savefig(save_path)
+        print('='*5+f'MAP HAS BEEN SAVED TO {save_path}'+'='*5)
     plt.show()
 
 
 def animate_path(path: np.array,
                  grid: np.array,
+                 rendered_path: np.array,
                  skeleton: np.array,
                  start=None, goal=None,
                  animation_speed=10,
-                 save=False) -> None:
+                 save_path=None) -> None:
     """ The function is showing the figure with animated path
     The path is represented as a list of waypoints and coordinates on the map
     """
     # Set up the figure and axis
     fig, ax = plt.subplots()
-    """ Start from the starting coordinate """
-    # ax.set_xlim(np.min(path[:, 0]), np.max(path[:, 0]))
-    # ax.set_ylim(np.min(path[:, 1]), np.max(path[:, 1]))
     """ Center according to the grid """
+    # define figure dimensions
     ax.set_xlim(0, grid.shape[0])
     ax.set_ylim(0, grid.shape[1])
     line, = ax.plot([], [], marker='o')
@@ -266,6 +273,8 @@ def animate_path(path: np.array,
     # Plot the grid
     ax.imshow(grid, origin='lower')
     ax.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+    # Plot the path
+    ax.plot(path[:, 1], path[:, 0], 'g')
 
     # Define the update function
     def update(frame):
@@ -278,18 +287,19 @@ def animate_path(path: np.array,
     num_frames = path.shape[0]
     anim = animation.FuncAnimation(fig, update, frames=num_frames, interval=animation_speed, blit=True)
 
+    # save the animation as gif
+    if save_path is not None:
+        # FIXME: cannot save the gif yet
+        print('Saving path following gif...')
+        writergif = animation.PillowWriter(fps=30)
+        anim.save(save_path, writer=writergif)
+        print('='*5+f'ANIMATED PATH HAS BEEN SAVED'+'='*5)
+
     # Display the animation
     plt.show()
 
-    # save the animation as gif
-    if save:
-        anim = animation.FuncAnimation(fig, update, frames=200, interval=10, blit=True)
-        writergif = animation.PillowWriter(fps=30)
-        anim.save('data_storage/images/path_following.gif', writer=writergif)
-        print('='*5+f'ANIMATED PATH HAS BEEN SAVED'+'='*5)
 
-
-def select_point(grid: np.array, skeleton: np.array):
+def select_point(grid: np.array, skeleton: np.array, start=None, goal=None) -> tuple:
     # Display the figure
     fig, ax = plt.subplots()
     ax.set_xlim(0, grid.shape[1])
@@ -297,6 +307,11 @@ def select_point(grid: np.array, skeleton: np.array):
     # Plot the grid
     ax.imshow(grid, origin='lower')
     ax.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+    # Plot start or goal locations
+    if start is not None:
+        ax.plot(start[1], start[0], 'rx')
+    if goal is not None:
+        ax.plot(goal[1], goal[0], 'rx')
     # Show
     plt.show(block=False)
 

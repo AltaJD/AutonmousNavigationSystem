@@ -27,7 +27,7 @@ if __name__ == '__main__':
     start_default, goal_default = (start_default[0], start_default[1]), (goal_default[0], goal_default[1])
     grid, skeleton, distances, original_data = map.create_custom_map(filename=filename, safety_distance=safety_distance)
     # select start and goal locations
-    goal = map.select_point(grid, skeleton)
+    goal = map.select_point(grid, skeleton, start_default)
     print(goal)
     if not map.valid_destination(grid, start_default, goal):
         map.show_map(grid, skeleton, start_default, goal)
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     """=== Save Grids for providing multiple and different formats ==="""
     # map.save_grid(grid_filename, grid)
     # map.save_grid(skeleton_file_name, skeleton)
-    """=== Read Grids for testing multiple versions ==="""
+    """=== Read Grids for testing multiple versions in the future ==="""
     # grid     = map.read_grid(file_path=grid_filename, dtype=np.float)
     # skeleton = map.read_grid(file_path=skeleton_file_name, dtype=np.int)
     """=== Print map data === """
@@ -52,8 +52,10 @@ if __name__ == '__main__':
     # pprint(distances)
     # map.show_map(grid, skeleton, start_default, goal_default)
     """ === Path planning === """
-    path: np.array = map.get_path(grid=grid, start=start_default, goal=goal) # get list of waypoints
-    map.save_grid(path_file_name, path)
-    path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)
-    # print(path)
-    map.animate_path(path, grid, skeleton, start=start_default, goal=goal, animation_speed=5)
+    absolute_path: np.array = map.get_path(grid=grid, start=start_default, goal=goal) # get list of waypoints
+    # map.save_grid(path_file_name, absolute_path)
+    # absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)
+    map.show_map(grid=grid, skeleton=skeleton, path=absolute_path, start=start_default, goal=goal, save_path='./data_storage/images/images.png')
+    map.animate_path(absolute_path, grid, absolute_path, skeleton,
+                     start=start_default, goal=goal,
+                     animation_speed=5)
