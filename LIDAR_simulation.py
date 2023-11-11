@@ -17,7 +17,7 @@ class LIDAR:
     """
 
     measuring_radius: int # radius is given in meters
-    measurement_results: Queue # queue of tuples (angle, distance)
+    measurement_results: Queue # queue of tuples (angle: float, distance: float)
 
     def __init__(self, radius: int):
         self.measuring_radius = radius
@@ -30,6 +30,11 @@ class LIDAR:
         return text
 
     def get_values(self) -> list:
+        """ Assumption: LIDAR provides measurements one-by-one in the format:
+        angle, distance for each point
+        The values are appended to the list for storage and easier data validation.
+        :returns [(angle1, distance1), (angle2, distance2)]
+        """
         start_time = time.time()
         data = []
         while not self.measurement_results.empty():
@@ -41,7 +46,7 @@ class LIDAR:
         """
         The function returns the coordinates of the matrix points
         which are inside the circle of the measuring radius
-        :return 2D matrix with the coordinates of [[x, y],...]
+        :return 2D matrix with the coordinates of [[x1, y1], [x2, y2], ...]
         """
         # Create an array of indices for the grid matrix
         indices = np.indices(grid.shape)
@@ -56,10 +61,15 @@ class LIDAR:
         return coordinates_within_radius
 
     def scan(self, grid: np.array, current_location: tuple) -> None:
+        """ The purchased LIDAR has a limit of scanning distance
+        We may assume that any measurements received from the LIDAR are the location of obstacles withing scanning area
+        Otherwise, freeway is assumed if no measurement detected for specific angle
+        This function is only simulating which data will be passed to the system
+        """
         coordinates = self.get_scanning_area(grid, current_location)
         for coor in coordinates:
             i, j = coor[0], coor[1]
-            if grid[i, j] == 1:
+            if grid[i, j] == 1: # if obstacle is detected
                 distance = np.sqrt((current_location[0] - i)**2 + (current_location[1] - j)**2)
                 angle = self.get_obstacle_vector(current_node=current_location, next_node=(i, j))
                 print(i, j)

@@ -324,3 +324,11 @@ def select_point(grid: np.array, skeleton: np.array, start=None, goal=None) -> t
     # convert to the proper format
     location = (round(points[0][1]), round(points[0][0]))
     return location
+
+
+def add_obstacles(grid: np.array, obstacle) -> None:
+    """ The function add the obstacle locations to the main map
+    and save the new map to the csv file
+    """
+    # TODO: add method
+    pass

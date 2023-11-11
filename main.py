@@ -4,6 +4,9 @@ from pprint import pprint
 import sys
 import config_extractor as config
 from behavioral_model import IntelligentWheelchair
+import sys
+
+
 
 if __name__ == '__main__':
     """ === Get configuration === 
@@ -14,6 +17,8 @@ if __name__ == '__main__':
     4. Path to the colliders coordinates
     5. Path to save the map as csv file for better view of the array and debugging
     """
+    if sys.version_info[0:2] != (3, 6):
+        raise Exception('Requires python 3.6')
     start_default:      tuple = config.get('initial_position')
     goal_default:       tuple = config.get('final_position')
     safety_distance:    float = config.get('safety_distance')

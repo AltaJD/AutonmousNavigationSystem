@@ -43,7 +43,7 @@ class IntelligentWheelchair:
         The position vector is essential to determine the next maneuver to be correctly calculated
         """
         self.status = WheelchairStatus.IDLE
-        self.current_position = current_position
+        self.current_position = current_position # (y, x)
         self.current_angle = current_angle
 
     def __str__(self) -> str:
