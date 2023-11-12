@@ -300,6 +300,9 @@ def animate_path(path: np.array,
 
 
 def select_point(grid: np.array, skeleton: np.array, start=None, goal=None) -> tuple:
+    """ Show the 2D environment map for selection of coordinates by mouse click
+    :returns (y, x) coordinates of the map
+    """
     # Display the figure
     fig, ax = plt.subplots()
     ax.set_xlim(0, grid.shape[1])
@@ -328,7 +331,9 @@ def select_point(grid: np.array, skeleton: np.array, start=None, goal=None) -> t
 
 def add_obstacles(grid: np.array, obstacle) -> None:
     """ The function add the obstacle locations to the main map
-    and save the new map to the csv file
+    and save the new map to the csv file.
+    It allows to test the obstacle avoidance system and A* algorithm,
+    in case no maneuvers are available
     """
     # TODO: add method
     pass

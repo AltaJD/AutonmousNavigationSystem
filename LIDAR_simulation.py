@@ -4,6 +4,7 @@ It is used to prepare data processing upon application of real LIDAR and determi
 from queue import Queue
 import time
 import numpy as np
+from numpy import sin, cos, radians
 import math
 from pprint import pprint
 import matplotlib.pyplot as plt
@@ -40,6 +41,8 @@ class LIDAR:
         while not self.measurement_results.empty():
             data.append(self.measurement_results.get())
         print('='*5+f'LIDAR DATA RECEIVED {time.time()-start_time}'+'='*5)
+        data.sort() # sort by angle in ascending order
+        print(data)
         return data
 
     def get_scanning_area(self, grid: np.array, current_node: tuple) -> np.array:
@@ -60,43 +63,55 @@ class LIDAR:
         pprint(coordinates_within_radius)
         return coordinates_within_radius
 
-    def scan(self, grid: np.array, current_location: tuple) -> None:
+    def scan(self, grid: np.array, current_location: tuple, initial_angle: float) -> None:
         """ The purchased LIDAR has a limit of scanning distance
         We may assume that any measurements received from the LIDAR are the location of obstacles withing scanning area
         Otherwise, freeway is assumed if no measurement detected for specific angle
         This function is only simulating which data will be passed to the system
+        Initial angle is given in degrees
         """
+        plt.imshow(grid, origin='lower') # Testing
         coordinates = self.get_scanning_area(grid, current_location)
         for coor in coordinates:
-            i, j = coor[0], coor[1]
-            if grid[i, j] == 1: # if obstacle is detected
-                distance = np.sqrt((current_location[0] - i)**2 + (current_location[1] - j)**2)
-                angle = self.get_obstacle_vector(current_node=current_location, next_node=(i, j))
-                print(i, j)
-                record = (angle, distance)
+            x, y = coor[0], coor[1] # get the coordinates x and y
+            if grid[x, y] == 1: # if obstacle is detected
+                distance: float = np.sqrt((current_location[0] - x)**2 + (current_location[1] - y)**2)
+                angle:    float = self.get_obstacle_vector(current_node=current_location, next_node=(y, x))
+                print(f'Rotation angle is {angle*180/np.pi}')
+                print(f'Obstacle distance is {distance}')
+                record = (angle, distance) # compress the data into tuple
                 self.measurement_results.put(record)
+                print(y, x)
+                plt.plot(y, x, 'yx') # Testing
         print('ENVIRONMENT HAS BEEN SCANNED')
+        # show the wheelchair vector and scanning area
+        plt.plot(current_location[1], current_location[0], 'gx')
+        plt.plot(current_location[1]+sin(radians(initial_angle))*10, current_location[0]+cos(radians(initial_angle))*10, 'gx')
+        # plt.show() # Testing
 
     def show_scanning_area(self, grid: np.array, skeleton: np.array, current_node: tuple) -> None:
         area: np.array = self.get_scanning_area(grid, current_node)
+        # expand area to fit grid size
+        normalized_area = np.zeros((grid.shape[0], grid.shape[1]))
+        for coor in area:
+            x, y = coor[0], coor[1]
+            normalized_area[x][y] = 1
         plt.imshow(grid, origin='lower')
         plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
-        for coor in area:
-            plt.plot(coor[1], coor[0], 'gx')
+        plt.imshow(normalized_area, origin='lower', alpha=0.5)
         # show the current position
         plt.plot(current_node[1], current_node[0], 'rx')
         plt.xlabel('EAST')
         plt.ylabel('NORTH')
+        plt.title('Scanning range of LIDAR')
         plt.show()
-        """ Show the scanning area on the figure"""
 
     @staticmethod
     def get_obstacle_vector(next_node: tuple, current_node: tuple) -> float:
         """
-        Returns arctan between two points in radians
+        Returns arctan between two points as radians
         """
-        y_diff = next_node[1] - current_node[1]
-        x_diff = next_node[0] - current_node[0]
-        angle = math.atan2(y_diff, x_diff)
-        print(f'Rotation angle is {angle}')
+        y_diff = next_node[0] - current_node[1]
+        x_diff = next_node[1] - current_node[0]
+        angle: float = math.atan2(y_diff, x_diff)
         return angle

@@ -30,7 +30,7 @@ class IntelligentWheelchair:
     """
     name: Optional[str]
     current_position: tuple
-    current_angle: float
+    current_angle: float # in degrees
     goal_position: tuple
     length: float
     width: float
@@ -50,6 +50,7 @@ class IntelligentWheelchair:
         return f"Class:\tIntelligentWheelchair\n" \
                f"Name:\t{self.name}\n" \
                f"Current position:\t{self.current_position}\n" \
+               f"Current angle:\t{self.current_angle}\n" \
                f"Goal position:\t{self.goal_position}\n" \
                f"Size (l,w, h):\t{(self.length, self.width, self.height)}\n"
 
