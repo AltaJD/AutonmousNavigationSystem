@@ -5,6 +5,7 @@ from LIDAR_simulation import LIDAR
 from behavioral_model import IntelligentWheelchair
 from typing import List
 from math import cos, sin
+from statistics import median
 import matplotlib.pyplot as plt
 
 """ === Functions to get Vector Field Histogram === """
@@ -46,7 +47,7 @@ def show_obstacle_map(measurements: List[tuple], measuring_distance: int) -> Non
     The current location in (y, x) is coordinates of the wheelchair according to the map
     The grid with 1+distance: int and 0, where 1+distance is a certainty value of obstacle
     """
-    # FIXME: increase accuracy. The map is incorrect
+    # FIXME: increase accuracy.
     # create obstacle_grid simulation with zeros by default
     obstacle_grid = np.zeros((measuring_distance+1, measuring_distance+1))
     for value in measurements:
@@ -144,8 +145,8 @@ def get_sectors(measurements: List[tuple], magnitudes: np.array, alpha: float) -
             h_k.append(round(m_sum, 0)) # store the sector cumulative magnitude
             m_sum = 0 # reset sum
             starting_angle = beta # set the new starting angle for the sector in degrees
-    print("RAW OBSTACLE HISTOGRAM")
-    print(h_k)
+    # print("RAW OBSTACLE HISTOGRAM")
+    # print(h_k)
     # expand the angle ranges from 0 to 360 degrees
     initial_angle: float = measurements[0][0]*180/np.pi # degrees
     if initial_angle < 0:
@@ -153,22 +154,23 @@ def get_sectors(measurements: List[tuple], magnitudes: np.array, alpha: float) -
     sectors_num = int(360/alpha) # number of sectors
     initial_sector = int(initial_angle/alpha) # starting sector
     normalized_histogram = expand_histogram(angles=h_k, max_size=sectors_num, starting_index=initial_sector)
-    print("EXPANDED OBSTACLE HISTOGRAM")
-    print(normalized_histogram)
+    # print("EXPANDED OBSTACLE HISTOGRAM")
+    # print(normalized_histogram)
     return normalized_histogram
 
 
-def get_vfh(measurements: List[tuple], alpha: int, a: int, b: int) -> np.array:
+def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
     """ The function will generate the Vector Field Histogram
     The magnitude of the obstacle is represented as a formula:
     m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
     where:
     1. c[i][j] = certainty value
     2. d[i][j] = distances to each obstacle
-    3. a and b are positive constants
+    3. a and b are positive constants, where a = b*max(distance)
     4. m[i][j] will be a one dimensional array consisting of values greater than 0
 
     alpha is an angle division that should be in degrees
+    :returns np.array with shape: (n, 0)
     """
     c: np.array = get_certainty_values(measurements)
     # since the distance is included in the certainty values, it can be extracted as follows:
@@ -177,21 +179,52 @@ def get_vfh(measurements: List[tuple], alpha: int, a: int, b: int) -> np.array:
         cell_value = d[i]
         if cell_value > 0:
             d[i] = cell_value - 1
+    if a is None:
+        a = b*max(d)
     magnitudes: np.array = (c**2)*(a-b*d) # m[i][j]
-    # since a constant is very small, we can convert negative values back to positive values
-    magnitudes = 0-magnitudes
-    print('MAGNITUDES')
-    print(magnitudes)
     histogram = get_sectors(measurements, magnitudes, alpha)
-    # smooth histogram
-    print("""==== RECEIVED HISTOGRAM ====""")
-    print(np.array(histogram))
-    # show_histogram(np.array(histogram))
     histogram_smoothed = smooth_histogram(h=histogram, l=3)
-    print("""==== SMOOTHED HISTOGRAM ====""")
-    print(histogram_smoothed)
-    # show_histogram(histogram)
-    return histogram_smoothed
+    # show magnitudes as percentages (from 0 to 1)
+    highest_magnitude = max(histogram_smoothed)
+    normalized_histogram = np.array([magnitude/highest_magnitude for magnitude in histogram_smoothed])
+    return normalized_histogram
+
+
+def get_rotation_angle(h: np.array, threshold=0.0) -> int:
+    """ Get the angle with the lowest probability of the obstacles ahead 
+    :param h is histogram represented as np.array with a shape (n, 0)
+    :param threshold in % specifies the minimum obstacle probability acceptable as obstacle-free path
+    :param next_node provides the data for choosing the most appropriate steering direction
+    :return angle in degrees
+    """
+    # determining angle that is the closest to the target point
+    obstacle_free_sectors: List[int] = np.where(h <= threshold)[0]
+    print('SECTORS')
+    print(obstacle_free_sectors)
+    # merge neighbor sectors
+    merged_sectors: List[list] = []
+    wide_sector = []
+    # TODO: optimize
+    for i in range(len(obstacle_free_sectors) - 1):
+        current_value = obstacle_free_sectors[i]
+        next_value = obstacle_free_sectors[i+1]
+        difference = next_value - current_value
+        if difference == 1:
+            wide_sector.append(current_value)
+            if (i + 1) != len(obstacle_free_sectors) - 1:
+                continue
+            else:
+                wide_sector.append(next_value)
+        if len(wide_sector) != 0:
+            # append the last value
+            wide_sector.append(current_value)
+            merged_sectors.append(wide_sector)
+            wide_sector = []
+    print('MERGED SECTORS')
+    print(merged_sectors)
+    # selection of the middle angle or median angle within angle/sector
+    desired_angle = median(merged_sectors[0])
+    return desired_angle
 
 
 if __name__ == '__main__':
@@ -210,15 +243,19 @@ if __name__ == '__main__':
     lidar = LIDAR(radius=config.get('lidar_radius')) # set scanning radius of the lidar as 30 meters or 30x30 matrix within grid
     wheelchair = IntelligentWheelchair(current_position=start_default, current_angle=0.0)
     """ Find the location of the new obstacles """
-    lidar.scan(grid=grid, current_location=wheelchair.current_position, initial_angle=wheelchair.current_angle)
+    lidar.scan(grid=grid, current_location=wheelchair.current_position)
     """ Show obstacles detected by LIDAR """
     # show_obstacle_map(lidar.get_values(), measuring_distance=lidar.measuring_radius)
     """ Get Vector Field Histogram (VFH) """
     sector_angle: int = 10 # degrees
-    # TODO: determine a and b such that a-b*dmax = 0
     a, b = 1, 1
     histogram = get_vfh(measurements=lidar.get_values(),
-                        alpha=sector_angle,
-                        a=a, b=b)
+                        alpha=sector_angle, b=b)
+    """ Path selection with lowest probability of obstacles """
+    angle = get_rotation_angle(h=histogram, threshold=0.0)
+    print('NEXT ROTATION ANGLE and VALUE')
+    print(angle)
+    wheelchair.current_angle = float(angle) # update wheelchair steering direction
     show_histogram(h=histogram, grid=grid, skeleton=skeleton, current_location=wheelchair.current_position)
-    lidar.show_scanning_area(grid, skeleton, current_node=start_default)
+    map.show_map(grid, skeleton, start=wheelchair.current_position, initial_vector=(wheelchair.current_angle, 1))
+    # lidar.show_scanning_area(grid, skeleton, current_node=start_default)

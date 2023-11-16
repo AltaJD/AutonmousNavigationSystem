@@ -4,7 +4,6 @@ It is used to prepare data processing upon application of real LIDAR and determi
 from queue import Queue
 import time
 import numpy as np
-from numpy import sin, cos, radians
 import math
 from pprint import pprint
 import matplotlib.pyplot as plt
@@ -63,14 +62,13 @@ class LIDAR:
         pprint(coordinates_within_radius)
         return coordinates_within_radius
 
-    def scan(self, grid: np.array, current_location: tuple, initial_angle: float) -> None:
+    def scan(self, grid: np.array, current_location: tuple) -> None:
         """ The purchased LIDAR has a limit of scanning distance
         We may assume that any measurements received from the LIDAR are the location of obstacles withing scanning area
         Otherwise, freeway is assumed if no measurement detected for specific angle
         This function is only simulating which data will be passed to the system
         Initial angle is given in degrees
         """
-        plt.imshow(grid, origin='lower') # Testing
         coordinates = self.get_scanning_area(grid, current_location)
         for coor in coordinates:
             x, y = coor[0], coor[1] # get the coordinates x and y
@@ -82,12 +80,7 @@ class LIDAR:
                 record = (angle, distance) # compress the data into tuple
                 self.measurement_results.put(record)
                 print(y, x)
-                plt.plot(y, x, 'yx') # Testing
         print('ENVIRONMENT HAS BEEN SCANNED')
-        # show the wheelchair vector and scanning area
-        plt.plot(current_location[1], current_location[0], 'gx')
-        plt.plot(current_location[1]+sin(radians(initial_angle))*10, current_location[0]+cos(radians(initial_angle))*10, 'gx')
-        # plt.show() # Testing
 
     def show_scanning_area(self, grid: np.array, skeleton: np.array, current_node: tuple) -> None:
         area: np.array = self.get_scanning_area(grid, current_node)

@@ -31,6 +31,7 @@ class IntelligentWheelchair:
     name: Optional[str]
     current_position: tuple
     current_angle: float # in degrees
+    current_speed: float
     goal_position: tuple
     length: float
     width: float
@@ -68,8 +69,8 @@ class IntelligentWheelchair:
         """
         rotation = self.rotation_angle(next_node=next_node)
         self.current_position = next_node
+        self.current_angle = rotation
         print(f'Wheelchair moved to: {next_node}')
-        pass
 
     def stop(self) -> None:
         pass
@@ -79,6 +80,7 @@ class IntelligentWheelchair:
         """ The function calculate the angle for rotation the wheelchair
         It is based on the arctan between two points
         """
+        # TODO: test
         y_diff = next_node[1]-self.current_position[1]
         x_diff = next_node[0]-self.current_position[0]
         angle = math.atan2(y_diff, x_diff)

@@ -10,6 +10,7 @@ from queue import PriorityQueue
 from tqdm import tqdm
 import csv
 import sys
+from math import sin, cos, radians
 
 
 def valid_destination(grid: np.array, start: tuple, goal: tuple) -> bool:
@@ -225,7 +226,12 @@ def read_grid(file_path, dtype) -> np.array:
 """=== Movement animation ==="""
 
 
-def show_map(grid, skeleton, start=None, goal=None, path=None, save_path=None):
+def show_map(grid, skeleton, start=None, initial_vector=None, goal=None, path=None, save_path=None) -> None:
+    """ Plot the graph using matplotlib to show objects based on the parameters
+    If parameter is not provided, it will not be displayed on the map
+    Parameter initial vector is a tuple (angle, length) of the vector
+    :returns None
+    """
     # plot the edges on top of the grid along with start and goal locations
     plt.imshow(grid, origin='lower')
     plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
@@ -236,6 +242,14 @@ def show_map(grid, skeleton, start=None, goal=None, path=None, save_path=None):
 
     if start is not None:
         plt.plot(start[1], start[0], 'rx')
+        angle, length = 0, 10 # in degrees and meters
+        if initial_vector is not None:
+            angle, length = initial_vector
+        vector_x = start[1]+sin(radians(angle))*length
+        vector_y = start[0]+cos(radians(angle))*length
+        plt.quiver(start[1], start[0], vector_y, vector_x, color='b')
+        # show angle difference on the map
+        plt.quiver(start[1], start[0], sin(0)*length, cos(0)*length, color='r')
     if goal is not None:
         plt.plot(goal[1], goal[0], 'rx')
 
