@@ -1,7 +1,7 @@
 import config_extractor as config
 import map
 import numpy as np
-from LIDAR_simulation import LIDAR
+from LIDAR_simulation import LIDAR, get_obstacle_vector
 from behavioral_model import IntelligentWheelchair
 from typing import List
 from math import cos, sin
@@ -34,6 +34,8 @@ def show_histogram(h: np.array, grid: np.array, skeleton: np.array, current_loca
     ax2.set_title('Environment map')
     # show the current location
     ax2.plot(current_location[1], current_location[0], 'rx')
+    # show 0 angle vector
+    plt.quiver(current_location[1], current_location[0], sin(0) * 1, cos(0) * 1, color='r')
     # adjusting spacing between subplots
     plt.tight_layout()
     plt.show()
@@ -183,14 +185,14 @@ def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
         a = b*max(d)
     magnitudes: np.array = (c**2)*(a-b*d) # m[i][j]
     histogram = get_sectors(measurements, magnitudes, alpha)
-    histogram_smoothed = smooth_histogram(h=histogram, l=3)
+    histogram_smoothed = smooth_histogram(h=histogram, l=1)
     # show magnitudes as percentages (from 0 to 1)
     highest_magnitude = max(histogram_smoothed)
     normalized_histogram = np.array([magnitude/highest_magnitude for magnitude in histogram_smoothed])
     return normalized_histogram
 
 
-def get_rotation_angle(h: np.array, threshold=0.0) -> int:
+def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold=0.0) -> int:
     """ Get the angle with the lowest probability of the obstacles ahead 
     :param h is histogram represented as np.array with a shape (n, 0)
     :param threshold in % specifies the minimum obstacle probability acceptable as obstacle-free path
@@ -223,7 +225,21 @@ def get_rotation_angle(h: np.array, threshold=0.0) -> int:
     print('MERGED SECTORS')
     print(merged_sectors)
     # selection of the middle angle or median angle within angle/sector
-    desired_angle = median(merged_sectors[0])
+    if len(merged_sectors) == 0:
+        return 0
+    if next_node is None and current_node is None:
+        desired_angle = median(merged_sectors[0])*10
+    else:
+        angle = get_obstacle_vector(next_node=next_node, current_node=current_node)*180/np.pi
+        min_diff = 360
+        best_angle = 0
+        for sectors in merged_sectors:
+            median_angle = median(sectors)*10
+            difference = abs(angle-median_angle)
+            if difference < min_diff:
+                min_diff = difference
+                best_angle = median_angle
+        desired_angle = best_angle
     return desired_angle
 
 
@@ -240,7 +256,8 @@ if __name__ == '__main__':
     start_default = map.select_point(grid, skeleton) # update starting position
     print(start_default)
     """ Create instances of the objects """
-    lidar = LIDAR(radius=config.get('lidar_radius')) # set scanning radius of the lidar as 30 meters or 30x30 matrix within grid
+    # set scanning radius of the lidar as 30 meters or 30x30 matrix within grid
+    lidar = LIDAR(radius=config.get('lidar_radius'))
     wheelchair = IntelligentWheelchair(current_position=start_default, current_angle=0.0)
     """ Find the location of the new obstacles """
     lidar.scan(grid=grid, current_location=wheelchair.current_position)
@@ -257,5 +274,5 @@ if __name__ == '__main__':
     print(angle)
     wheelchair.current_angle = float(angle) # update wheelchair steering direction
     show_histogram(h=histogram, grid=grid, skeleton=skeleton, current_location=wheelchair.current_position)
+    lidar.show_scanning_area(grid, skeleton, current_node=start_default)
     map.show_map(grid, skeleton, start=wheelchair.current_position, initial_vector=(wheelchair.current_angle, 1))
-    # lidar.show_scanning_area(grid, skeleton, current_node=start_default)

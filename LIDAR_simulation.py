@@ -9,6 +9,16 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 
 
+def get_obstacle_vector(next_node: tuple, current_node: tuple) -> float:
+    """
+    Returns arctan between two points as radians
+    """
+    y_diff = next_node[0] - current_node[1]
+    x_diff = next_node[1] - current_node[0]
+    angle: float = math.atan2(y_diff, x_diff)
+    return angle
+
+
 class LIDAR:
 
     """ The object will contain measurement results as an angle and distance toward obstacle
@@ -74,12 +84,12 @@ class LIDAR:
             x, y = coor[0], coor[1] # get the coordinates x and y
             if grid[x, y] == 1: # if obstacle is detected
                 distance: float = np.sqrt((current_location[0] - x)**2 + (current_location[1] - y)**2)
-                angle:    float = self.get_obstacle_vector(current_node=current_location, next_node=(y, x))
-                print(f'Rotation angle is {angle*180/np.pi}')
-                print(f'Obstacle distance is {distance}')
+                angle:    float = get_obstacle_vector(current_node=current_location, next_node=(y, x))
+                # print(f'Rotation angle is {angle*180/np.pi}')
+                # print(f'Obstacle distance is {distance}')
                 record = (angle, distance) # compress the data into tuple
                 self.measurement_results.put(record)
-                print(y, x)
+                # print(y, x)
         print('ENVIRONMENT HAS BEEN SCANNED')
 
     def show_scanning_area(self, grid: np.array, skeleton: np.array, current_node: tuple) -> None:
@@ -98,13 +108,3 @@ class LIDAR:
         plt.ylabel('NORTH')
         plt.title('Scanning range of LIDAR')
         plt.show()
-
-    @staticmethod
-    def get_obstacle_vector(next_node: tuple, current_node: tuple) -> float:
-        """
-        Returns arctan between two points as radians
-        """
-        y_diff = next_node[0] - current_node[1]
-        x_diff = next_node[1] - current_node[0]
-        angle: float = math.atan2(y_diff, x_diff)
-        return angle
