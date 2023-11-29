@@ -1,9 +1,11 @@
-from enum import Enum
-import math
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Optional
+from typing import Optional, Tuple
 from enum import Enum
+from collision_avoidance_simulation import get_vfh, get_rotation_angle, show_histogram
+from math import sin, cos, radians
+from LIDAR_simulation import LIDAR, get_distance
+import config_extractor as config
 
 
 class WheelchairStatus(Enum):
@@ -23,14 +25,13 @@ class WheelchairStatus(Enum):
 
 
 class IntelligentWheelchair:
-
     """
     The object consider the list of the functions available
     for different services
     """
     name: Optional[str]
-    current_position: tuple
-    current_angle: float # in degrees
+    current_position: Tuple[float, float]  # (y, x)
+    current_angle: float  # in degrees
     current_speed: float
     goal_position: tuple
     length: float
@@ -38,14 +39,16 @@ class IntelligentWheelchair:
     height: Optional[float]
     battery_level: float
     status: WheelchairStatus
+    lidar: LIDAR
 
-    def __init__(self, current_position: tuple, current_angle: float):
+    def __init__(self, current_position: tuple, current_angle: float, lidar: LIDAR):
         """ Set the values by default, such as status of the wheelchair
         The position vector is essential to determine the next maneuver to be correctly calculated
         """
         self.status = WheelchairStatus.IDLE
-        self.current_position = current_position # (y, x)
+        self.current_position = current_position  # (y, x)
         self.current_angle = current_angle
+        self.lidar = lidar
 
     def __str__(self) -> str:
         return f"Class:\tIntelligentWheelchair\n" \
@@ -63,29 +66,44 @@ class IntelligentWheelchair:
         plt.plot(self.current_position[0], self.current_position[1], 'rx')
         plt.show()
 
-    def move_to(self, next_node: tuple) -> None:
+    def move_to(self, target_node: tuple, grid: np.array) -> None:
         """ The function is calculating the current position and vector
         to determine the rotation angle required and
         """
+        # get parameters required for vfh
+        sector_angle: int = config.get('sector_angle')  # degrees
+        a, b = config.get('a'), config.get('b')
+        distance_tolerance = config.get('distance_tolerance')  # in meters
+
+        previous_node = self.current_position
         self.status = WheelchairStatus.MOVING
-        rotation = self.rotation_angle(next_node=next_node)
+        # reached_target: bool = (get_distance(target_node, self.current_position) < distance_tolerance)
+        # while not reached_target:
+        """==== Path selection with lowest probability of obstacles ===="""
+        histogram = get_vfh(measurements=self.lidar.get_values(), alpha=sector_angle, b=b)
+        angle = get_rotation_angle(h=histogram,
+                                   threshold=0.0,
+                                   current_node=previous_node,
+                                   next_node=target_node)
+        # update self steering direction and current node
+        self.current_angle = float(angle)
+        distance = 1  # let's say every meter, the lidar starts to scan TODO: change
+        next_node = (distance * cos(radians(angle)) + previous_node[0],
+                     distance * sin(radians(angle)) + previous_node[1])
         self.current_position = next_node
-        self.current_angle = rotation*180/np.pi
-        print(f'Wheelchair moved to: {next_node}')
+        self.lidar.scan(grid, current_location=self.current_position)
+        print(f"Current location\t {self.current_position}\n"
+              f"Previous location:\t {previous_node}\n"
+              f"Steering direction:\t {angle}")
+        show_histogram(h=histogram,
+                       grid=grid,
+                       current_location=self.current_position,
+                       steering_direction=self.current_angle)
+        self.stop()
 
     def stop(self) -> None:
+        self.status = WheelchairStatus.WAITING
         pass
-
-    """The functions accessible only for calculation"""
-    def rotation_angle(self, next_node: tuple) -> float:
-        """ The function calculate the angle for rotation the wheelchair
-        It is based on the arctan between two points
-        """
-        # TODO: test
-        y_diff = next_node[1]-self.current_position[1]
-        x_diff = next_node[0]-self.current_position[0]
-        angle = math.atan2(y_diff, x_diff)
-        return angle
 
 
 class Action(Enum):

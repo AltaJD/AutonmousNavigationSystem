@@ -2,7 +2,6 @@ import config_extractor as config
 import map as mp
 import numpy as np
 from LIDAR_simulation import LIDAR, get_obstacle_vector
-from behavioral_model import IntelligentWheelchair
 from typing import List
 from math import cos, sin
 import matplotlib.pyplot as plt
@@ -10,7 +9,7 @@ import matplotlib.pyplot as plt
 """ === Functions to get Vector Field Histogram === """
 
 
-def show_histogram(h: np.array, grid: np.array, skeleton: np.array, current_location: tuple, steering_direction=None) -> None:
+def show_histogram(h: np.array, grid: np.array, current_location: tuple, steering_direction=None, skeleton=None) -> None:
     """
     The function is using plt to plot the histogram and
     the map of the environment as subplots
@@ -20,7 +19,7 @@ def show_histogram(h: np.array, grid: np.array, skeleton: np.array, current_loca
     # get subplot objects ax1 and ax2
     fig, (ax1, ax2) = plt.subplots(2, 1)
     # get x axis for histogram
-    x = np.arange(h.shape[0])
+    x = np.arange(h.shape[0])*config.get('sector_angle')
     # plot histogram
     ax1.bar(x, h)
     ax1.set_xlabel('Angle (*10 degrees)')
@@ -28,7 +27,7 @@ def show_histogram(h: np.array, grid: np.array, skeleton: np.array, current_loca
     ax1.set_title('Vector Field Histogram')
     # plot grid
     ax2.imshow(grid, origin='lower')
-    ax2.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+    if skeleton: ax2.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
     ax2.set_xlabel('North')
     ax2.set_ylabel('East')
     ax2.set_title('Environment map')
@@ -206,7 +205,7 @@ def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
         a = b*max(d)
     magnitudes: np.array = (c**2)*(a-b*d) # m[i][j]
     histogram = get_sectors(measurements, magnitudes, alpha)
-    histogram_smoothed = smooth_histogram(h=histogram, l=1)
+    histogram_smoothed = smooth_histogram(h=histogram, l=1) # FIXME
     # show magnitudes as percentages (from 0 to 1)
     highest_magnitude = max(histogram_smoothed)
     normalized_histogram = np.array([magnitude/highest_magnitude for magnitude in histogram_smoothed])
@@ -249,6 +248,8 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
     print('OBSTACLE FREE SECTORS', obstacle_free_sectors, len(obstacle_free_sectors))
     minimums_diff = list(map(lambda x: abs(x-desired_angle), obstacle_free_sectors))
     best_angle = obstacle_free_sectors[minimums_diff.index(min(minimums_diff))]
+    # convert angle to degrees
+    best_angle *= config.get('sector_angle')
     print('Differences: ', minimums_diff, len(obstacle_free_sectors), minimums_diff.index(min(minimums_diff)))
     print('BEST ANGLE: ', best_angle)
     return best_angle
@@ -256,6 +257,7 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
 
 if __name__ == '__main__':
     # TESTING CODE
+    from behavioral_model import IntelligentWheelchair
     """ === Get default values ==="""
     grid_file            = config.get('grid_save')
     skeleton_file        = config.get('skeleton_save')
@@ -264,11 +266,10 @@ if __name__ == '__main__':
     goal_default:  tuple = config.get('final_position')
     """ Select the current position of the wheelchair """
     start_default = mp.select_point(grid, skeleton) # update starting position
-    print(start_default)
     """ Create instances of the objects """
     # set scanning radius of the lidar as 30 meters or 30x30 matrix within grid
     lidar = LIDAR(radius=config.get('lidar_radius'))
-    wheelchair = IntelligentWheelchair(current_position=start_default, current_angle=0.0)
+    wheelchair = IntelligentWheelchair(current_position=start_default, current_angle=0.0, lidar=lidar)
     """ Find the location of the new obstacles """
     lidar.scan(grid=grid, current_location=wheelchair.current_position)
     """ Show obstacles detected by LIDAR """

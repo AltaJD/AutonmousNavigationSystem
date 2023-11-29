@@ -19,6 +19,11 @@ def get_obstacle_vector(next_node: tuple, current_node: tuple) -> float:
     return angle
 
 
+def get_distance(next_node: tuple, current_node: tuple) -> float:
+    """ Return Euclidean distance between nodes in meters """
+    return np.sqrt( (next_node[0]-current_node[0])**2 + (next_node[1]-current_node[1])**2 )
+
+
 class LIDAR:
 
     """ The object will contain measurement results as an angle and distance toward obstacle
@@ -67,8 +72,8 @@ class LIDAR:
         indices_within_radius = np.where(distances <= self.measuring_radius)
         # Get the coordinates of the cells within the radius
         coordinates_within_radius = np.transpose(indices_within_radius)
-        print('SCANNING AREA COORDINATES')
-        pprint(coordinates_within_radius)
+        # print('SCANNING AREA COORDINATES') # TODO: remove
+        # pprint(coordinates_within_radius)
         return coordinates_within_radius
 
     def scan(self, grid: np.array, current_location: tuple) -> None:

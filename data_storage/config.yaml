@@ -6,8 +6,14 @@ wheelchair_width: 0.3 # 30 cm
 
 safety_distance: 0.5 # how close the wheelchair can approach obstacles
 lidar_radius: 30 # get the scanning range in meters
+distance_tolerance: 0.1 # in meters
 
 colliders: './data_storage/colliders.csv'
 grid_save: './data_storage/grid.csv'
 skeleton_save: './data_storage/skeleton.csv'
 path_save: './data_storage/path.csv'
+
+# VFH config
+sector_angle: 5
+a: 1
+b: 1
