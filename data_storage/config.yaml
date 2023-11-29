@@ -18,4 +18,4 @@ sector_angle: 5
 a: 1
 b: 1
 l: 5
-vfh_threshold: 0.3
+vfh_threshold: 0.4
