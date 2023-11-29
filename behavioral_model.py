@@ -67,9 +67,10 @@ class IntelligentWheelchair:
         """ The function is calculating the current position and vector
         to determine the rotation angle required and
         """
+        self.status = WheelchairStatus.MOVING
         rotation = self.rotation_angle(next_node=next_node)
         self.current_position = next_node
-        self.current_angle = rotation
+        self.current_angle = rotation*180/np.pi
         print(f'Wheelchair moved to: {next_node}')
 
     def stop(self) -> None:
@@ -84,7 +85,6 @@ class IntelligentWheelchair:
         y_diff = next_node[1]-self.current_position[1]
         x_diff = next_node[0]-self.current_position[0]
         angle = math.atan2(y_diff, x_diff)
-        print(f'Rotation angle is {angle}')
         return angle
 
 
@@ -110,7 +110,7 @@ class Action(Enum):
         elif self == self.RIGHT:
             return '>'
         elif self == self.UP:
-             return '^'
+            return '^'
         elif self == self.DOWN:
             return 'v'
 

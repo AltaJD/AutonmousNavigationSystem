@@ -32,9 +32,13 @@ if __name__ == '__main__':
     """ === Map generation === """
     # convert coordinates into tuple
     start_default, goal_default = (start_default[0], start_default[1]), (goal_default[0], goal_default[1])
-    grid, skeleton, distances, original_data = map.create_custom_map(filename=filename, safety_distance=safety_distance)
+    # grid, skeleton, distances, original_data = map.create_custom_map(filename=filename, safety_distance=safety_distance)
+    """=== Read Grids for testing multiple versions in the future ==="""
+    grid     = map.read_grid(file_path=grid_filename, dtype=np.float)
+    skeleton = map.read_grid(file_path=skeleton_file_name, dtype=np.int)
     # select start and goal locations
-    goal = map.select_point(grid, skeleton, start_default)
+    # goal = map.select_point(grid, skeleton, start_default)
+    goal = goal_default
     print(goal)
     if not map.valid_destination(grid, start_default, goal):
         map.show_map(grid, skeleton, start_default, goal)
@@ -47,9 +51,6 @@ if __name__ == '__main__':
     """=== Save Grids for providing multiple and different formats ==="""
     # map.save_grid(grid_filename, grid)
     # map.save_grid(skeleton_file_name, skeleton)
-    """=== Read Grids for testing multiple versions in the future ==="""
-    # grid     = map.read_grid(file_path=grid_filename, dtype=np.float)
-    # skeleton = map.read_grid(file_path=skeleton_file_name, dtype=np.int)
     """=== Print map data === """
     print(10*'='+f"Grid"+"="*10)
     pprint(grid)
@@ -59,32 +60,23 @@ if __name__ == '__main__':
     # pprint(distances)
     # map.show_map(grid, skeleton, start_default, goal_default)
     """ === Path planning === """
-    absolute_path: np.array = map.get_path(grid=grid, start=start_default, goal=goal) # get list of waypoints
+    # absolute_path: np.array = map.get_path(grid=grid, start=start_default, goal=goal) # get list of waypoints
     # map.save_grid(path_file_name, absolute_path)
-    # absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)
+    absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)
+    print(absolute_path)
     map.show_map(grid=grid, skeleton=skeleton, path=absolute_path, start=start_default, goal=goal, save_path='./data_storage/images/images.png')
     # map.animate_path(absolute_path, grid, absolute_path, skeleton,
     #                  start=start_default, goal=goal,
     #                  animation_speed=5)
-
-    """ Append VFH """
+    """ ==== Append VFH ==== """
     lidar = LIDAR_simulation.LIDAR(radius=config.get('lidar_radius'))
-    """ Find the location of the new obstacles """
+    """ ==== Find the location of the new obstacles ==== """
     lidar.scan(grid=grid, current_location=wheelchair.current_position)
-    """ Show obstacles detected by LIDAR """
+    """ ==== Show obstacles detected by LIDAR ==== """
     # show_obstacle_map(lidar.get_values(), measuring_distance=lidar.measuring_radius)
-    """ Get Vector Field Histogram (VFH) """
+    """ ==== Get Vector Field Histogram (VFH) ==== """
     sector_angle: int = 10  # degrees
     a, b = 1, 1
-    # histogram = get_vfh(measurements=lidar.get_values(),
-    #                     alpha=sector_angle, b=b)
-    # """ Path selection with lowest probability of obstacles """
-    # angle = get_rotation_angle(h=histogram, threshold=0.0)
-    # print('NEXT ROTATION ANGLE and VALUE')
-    # print(angle)
-    # wheelchair.current_angle = float(angle)  # update wheelchair steering direction
-    # show_histogram(h=histogram, grid=grid, skeleton=skeleton, current_location=wheelchair.current_position)
-    # map.show_map(grid, skeleton, start=wheelchair.current_position, initial_vector=(wheelchair.current_angle, 1))
     wheelchair.move_to(next_node=start_default)
     lidar.scan(grid, current_location=start_default)
     iteration = 0
@@ -92,16 +84,22 @@ if __name__ == '__main__':
         histogram = get_vfh(measurements=lidar.get_values(), alpha=sector_angle, b=b)
         """ Path selection with lowest probability of obstacles """
         angle = get_rotation_angle(h=histogram, threshold=0.0, current_node=wheelchair.current_position, next_node=node)
-        print('NEXT ROTATION ANGLE and VALUE')
-        print(angle)
+        angle *= 10
         # update wheelchair steering direction
-        wheelchair.current_angle = float(angle)
-        distance = 5 # let's say every meter, the lidar starts to scan
         previous_node = wheelchair.current_position
+        wheelchair.current_angle = float(angle)
+        distance = 1 # let's say every meter, the lidar starts to scan
         next_node = (distance*cos(radians(angle))+previous_node[0], distance*sin(radians(angle))+previous_node[1])
         wheelchair.move_to(next_node)
         lidar.scan(grid, current_location=next_node)
+        print(f"Current location\t {wheelchair.current_position}\n"
+              f"Previous location:\t {previous_node}\n"
+              f"Steering direction:\t {wheelchair.current_angle}")
         iteration += 1
-        if iteration % 1 == 0:
-            show_histogram(h=histogram, grid=grid, skeleton=skeleton, current_location=next_node)
+        if iteration % 5 == 0:
+            show_histogram(h=histogram,
+                           grid=grid,
+                           skeleton=skeleton,
+                           current_location=wheelchair.current_position,
+                           steering_direction=angle)
             # map.show_map(grid, skeleton, start=wheelchair.current_position, initial_vector=(wheelchair.current_angle, 1))

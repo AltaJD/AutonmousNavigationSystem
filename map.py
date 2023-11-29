@@ -245,8 +245,8 @@ def show_map(grid, skeleton, start=None, initial_vector=None, goal=None, path=No
         angle, length = 0, 10 # in degrees and meters
         if initial_vector is not None:
             angle, length = initial_vector
-        vector_x = start[1]+sin(radians(angle))*length
-        vector_y = start[0]+cos(radians(angle))*length
+        vector_x = start[0]+cos(radians(angle))*length
+        vector_y = start[1]+sin(radians(angle))*length
         plt.quiver(start[1], start[0], vector_y, vector_x, color='b')
         # show angle difference on the map
         plt.quiver(start[1], start[0], sin(0)*length, cos(0)*length, color='r')
@@ -263,7 +263,6 @@ def show_map(grid, skeleton, start=None, initial_vector=None, goal=None, path=No
 
 def animate_path(path: np.array,
                  grid: np.array,
-                 rendered_path: np.array,
                  skeleton: np.array,
                  start=None, goal=None,
                  animation_speed=10,

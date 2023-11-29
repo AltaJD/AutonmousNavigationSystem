@@ -51,7 +51,6 @@ class LIDAR:
             data.append(self.measurement_results.get())
         print('='*5+f'LIDAR DATA RECEIVED {time.time()-start_time}'+'='*5)
         data.sort() # sort by angle in ascending order
-        print(data)
         return data
 
     def get_scanning_area(self, grid: np.array, current_node: tuple) -> np.array:
@@ -85,11 +84,8 @@ class LIDAR:
             if grid[x, y] == 1: # if obstacle is detected
                 distance: float = np.sqrt((current_location[0] - x)**2 + (current_location[1] - y)**2)
                 angle:    float = get_obstacle_vector(current_node=current_location, next_node=(y, x))
-                # print(f'Rotation angle is {angle*180/np.pi}')
-                # print(f'Obstacle distance is {distance}')
                 record = (angle, distance) # compress the data into tuple
                 self.measurement_results.put(record)
-                # print(y, x)
         print('ENVIRONMENT HAS BEEN SCANNED')
 
     def show_scanning_area(self, grid: np.array, skeleton: np.array, current_node: tuple) -> None:

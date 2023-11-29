@@ -1,5 +1,5 @@
 import config_extractor as config
-import map
+import map as mp
 import numpy as np
 from LIDAR_simulation import LIDAR, get_obstacle_vector
 from behavioral_model import IntelligentWheelchair
@@ -11,11 +11,12 @@ import matplotlib.pyplot as plt
 """ === Functions to get Vector Field Histogram === """
 
 
-def show_histogram(h: np.array, grid: np.array, skeleton: np.array, current_location: tuple) -> None:
+def show_histogram(h: np.array, grid: np.array, skeleton: np.array, current_location: tuple, steering_direction=None) -> None:
     """
     The function is using plt to plot the histogram and
     the map of the environment as subplots
     The current location is indicated as a cross
+    The steering direction is indicated as a blue vector passed in degrees
      """
     # get subplot objects ax1 and ax2
     fig, (ax1, ax2) = plt.subplots(2, 1)
@@ -36,6 +37,10 @@ def show_histogram(h: np.array, grid: np.array, skeleton: np.array, current_loca
     ax2.plot(current_location[1], current_location[0], 'rx')
     # show 0 angle vector
     plt.quiver(current_location[1], current_location[0], sin(0) * 1, cos(0) * 1, color='r')
+    # show the steering direction
+    if steering_direction: plt.quiver(current_location[1], current_location[0],
+                                      sin(np.radians(steering_direction)), cos(np.radians(steering_direction)),
+                                      color='b')
     # adjusting spacing between subplots
     plt.tight_layout()
     plt.show()
@@ -74,17 +79,38 @@ def expand_histogram(angles: List[int], max_size: int, starting_index: int) -> L
     The function inserts the angles list to the resulting list from starting index
     :returns the list of size max_size (36) and including the angles list from the starting index
     """
+    def shift_to_right(values: List[int], size: int) -> List[int]:
+        """ If indexes > size => shift to the beginning of the list
+        Example: [0, 0, value3]
+        size = 2 => [value3, 0]
+        """
+        for i in range(size, len(values)):
+            values[i - size] = values[i]
+        return values
+
+    def fill_to_right(values: List[int], size: int) -> List[int]:
+        """ If indexes < size => expand the list up to max size
+        Example: [value1, value2]; size = 3 => [value1, value2, 0]
+        """
+        values = values + [0]*(size-len(values))
+        return values
+
     if len(angles) == max_size:
         # if no insertion is required:
         return angles
-    # insert process
-    expanded_list = np.zeros(max_size)
-    expanded_list = list(expanded_list)[:starting_index] + angles
-    print(expanded_list)
-    # shift values from max_size to len(expanded_list) indexes to the beginning of the list
-    for i in range(max_size, len(expanded_list)):
-        expanded_list[i-max_size] = expanded_list[i]
+    # insertion process
+    """ Shift the indexes by starting index 
+    Example:
+    starting_index = 1 => [0, value1, value2, ...]
+    starting_index = 2 => [0, 0, value1, value2, ...]
+    """
+    expanded_list = list(np.zeros(max_size))[:starting_index] + angles
+    if len(expanded_list) < max_size:
+        expanded_list = fill_to_right(expanded_list, max_size)
+    else:
+        expanded_list = shift_to_right(expanded_list, max_size)
     expanded_list = expanded_list[:max_size]
+    assert len(expanded_list) == max_size
     return expanded_list
 
 
@@ -147,8 +173,6 @@ def get_sectors(measurements: List[tuple], magnitudes: np.array, alpha: float) -
             h_k.append(round(m_sum, 0)) # store the sector cumulative magnitude
             m_sum = 0 # reset sum
             starting_angle = beta # set the new starting angle for the sector in degrees
-    # print("RAW OBSTACLE HISTOGRAM")
-    # print(h_k)
     # expand the angle ranges from 0 to 360 degrees
     initial_angle: float = measurements[0][0]*180/np.pi # degrees
     if initial_angle < 0:
@@ -156,8 +180,6 @@ def get_sectors(measurements: List[tuple], magnitudes: np.array, alpha: float) -
     sectors_num = int(360/alpha) # number of sectors
     initial_sector = int(initial_angle/alpha) # starting sector
     normalized_histogram = expand_histogram(angles=h_k, max_size=sectors_num, starting_index=initial_sector)
-    # print("EXPANDED OBSTACLE HISTOGRAM")
-    # print(normalized_histogram)
     return normalized_histogram
 
 
@@ -189,6 +211,9 @@ def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
     # show magnitudes as percentages (from 0 to 1)
     highest_magnitude = max(histogram_smoothed)
     normalized_histogram = np.array([magnitude/highest_magnitude for magnitude in histogram_smoothed])
+    print('FINAL HISTOGRAM')
+    print(normalized_histogram) # TODO: remove
+    print(len(normalized_histogram))
     return normalized_histogram
 
 
@@ -201,8 +226,6 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
     """
     # determining angle that is the closest to the target point
     obstacle_free_sectors: List[int] = np.where(h <= threshold)[0]
-    print('SECTORS')
-    print(obstacle_free_sectors)
     # merge neighbor sectors
     merged_sectors: List[list] = []
     wide_sector = []
@@ -222,25 +245,20 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
             wide_sector.append(current_value)
             merged_sectors.append(wide_sector)
             wide_sector = []
-    print('MERGED SECTORS')
-    print(merged_sectors)
-    # selection of the middle angle or median angle within angle/sector
-    if len(merged_sectors) == 0:
-        return 0
-    if next_node is None and current_node is None:
-        desired_angle = median(merged_sectors[0])*10
-    else:
-        angle = get_obstacle_vector(next_node=next_node, current_node=current_node)*180/np.pi
-        min_diff = 360
-        best_angle = 0
-        for sectors in merged_sectors:
-            median_angle = median(sectors)*10
-            difference = abs(angle-median_angle)
-            if difference < min_diff:
-                min_diff = difference
-                best_angle = median_angle
-        desired_angle = best_angle
-    return desired_angle
+    desired_angle = get_obstacle_vector(next_node=next_node, current_node=current_node)*180/np.pi
+    # select the angle closest to the desired angle
+    if desired_angle < 0:
+        desired_angle += 360
+    desired_angle = np.floor(desired_angle/10)
+    print('DESIRED ANGLE: ', desired_angle) # TODO: remove
+    minimum_diff = 0
+    best_angle = 0
+    for i in range(1, len(obstacle_free_sectors)):
+        diff = abs(desired_angle-obstacle_free_sectors[i]*10)
+        if minimum_diff < diff:
+            minimum_diff = diff
+            best_angle = obstacle_free_sectors[i]
+    return best_angle # FIXME
 
 
 if __name__ == '__main__':
@@ -248,12 +266,12 @@ if __name__ == '__main__':
     """ === Get default values ==="""
     grid_file            = config.get('grid_save')
     skeleton_file        = config.get('skeleton_save')
-    grid: np.array       = map.read_grid(file_path=grid_file, dtype=np.float)
-    skeleton: np.array   = map.read_grid(file_path=skeleton_file, dtype=np.int)
+    grid: np.array       = mp.read_grid(file_path=grid_file, dtype=np.float)
+    skeleton: np.array   = mp.read_grid(file_path=skeleton_file, dtype=np.int)
     start_default: tuple = config.get('initial_position')
     goal_default:  tuple = config.get('final_position')
     """ Select the current position of the wheelchair """
-    start_default = map.select_point(grid, skeleton) # update starting position
+    start_default = mp.select_point(grid, skeleton) # update starting position
     print(start_default)
     """ Create instances of the objects """
     # set scanning radius of the lidar as 30 meters or 30x30 matrix within grid
@@ -262,7 +280,7 @@ if __name__ == '__main__':
     """ Find the location of the new obstacles """
     lidar.scan(grid=grid, current_location=wheelchair.current_position)
     """ Show obstacles detected by LIDAR """
-    # show_obstacle_map(lidar.get_values(), measuring_distance=lidar.measuring_radius)
+    # show_obstacle_mp(lidar.get_values(), measuring_distance=lidar.measuring_radius)
     """ Get Vector Field Histogram (VFH) """
     sector_angle: int = 10 # degrees
     a, b = 1, 1
@@ -275,4 +293,4 @@ if __name__ == '__main__':
     wheelchair.current_angle = float(angle) # update wheelchair steering direction
     show_histogram(h=histogram, grid=grid, skeleton=skeleton, current_location=wheelchair.current_position)
     lidar.show_scanning_area(grid, skeleton, current_node=start_default)
-    map.show_map(grid, skeleton, start=wheelchair.current_position, initial_vector=(wheelchair.current_angle, 1))
+    mp.show_map(grid, skeleton, start=wheelchair.current_position, initial_vector=(wheelchair.current_angle, 1))
