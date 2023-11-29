@@ -39,6 +39,7 @@ def show_histogram(h: np.array, grid: np.array, current_location: tuple, steerin
     if steering_direction: plt.quiver(current_location[1], current_location[0],
                                       sin(np.radians(steering_direction)), cos(np.radians(steering_direction)),
                                       color='b')
+    ax2.figure.set_size_inches(10, 10)
     # adjusting spacing between subplots
     plt.tight_layout()
     plt.show()
@@ -205,7 +206,7 @@ def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
         a = b*max(d)
     magnitudes: np.array = (c**2)*(a-b*d) # m[i][j]
     histogram = get_sectors(measurements, magnitudes, alpha)
-    histogram_smoothed = smooth_histogram(h=histogram, l=1) # FIXME
+    histogram_smoothed = smooth_histogram(h=histogram, l=config.get('l'))
     # show magnitudes as percentages (from 0 to 1)
     highest_magnitude = max(histogram_smoothed)
     normalized_histogram = np.array([magnitude/highest_magnitude for magnitude in histogram_smoothed])
@@ -243,15 +244,15 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
     # select the angle closest to the desired angle
     if desired_angle < 0:
         desired_angle += 360
-    desired_angle = np.floor(desired_angle/10)
-    print('DESIRED ANGLE: ', desired_angle*10) # TODO: remove print statements
-    print('OBSTACLE FREE SECTORS', obstacle_free_sectors, len(obstacle_free_sectors))
+    desired_angle = np.floor(desired_angle/config.get('sector_angle'))
+    print('DESIRED ANGLE: ', desired_angle*config.get('sector_angle')) # TODO: remove print statements
+    # print('OBSTACLE FREE SECTORS', obstacle_free_sectors, len(obstacle_free_sectors))
     minimums_diff = list(map(lambda x: abs(x-desired_angle), obstacle_free_sectors))
     best_angle = obstacle_free_sectors[minimums_diff.index(min(minimums_diff))]
     # convert angle to degrees
     best_angle *= config.get('sector_angle')
-    print('Differences: ', minimums_diff, len(obstacle_free_sectors), minimums_diff.index(min(minimums_diff)))
-    print('BEST ANGLE: ', best_angle)
+    # print('Differences: ', minimums_diff, len(obstacle_free_sectors), minimums_diff.index(min(minimums_diff)))
+    # print('BEST ANGLE: ', best_angle)
     return best_angle
 
 

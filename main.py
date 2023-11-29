@@ -27,13 +27,12 @@ if __name__ == '__main__':
     skeleton_file_name: str   = config.get('skeleton_save')
     path_file_name:     str   = config.get('path_save')
 
-    """ === Map generation === """
-    # convert coordinates into tuple
+    """ === Convert coordinates into tuples === """
     start_default, goal_default = (start_default[0], start_default[1]), (goal_default[0], goal_default[1])
     """=== Read Grids for testing multiple versions in the future ==="""
     grid     = map.read_grid(file_path=grid_filename, dtype=np.float)
     skeleton = map.read_grid(file_path=skeleton_file_name, dtype=np.int)
-    # select start and goal locations
+    # select start or goal locations
     # goal = map.select_point(grid, skeleton, start_default)
     goal = goal_default
     print(goal)
@@ -47,32 +46,30 @@ if __name__ == '__main__':
     lidar.scan(grid=grid, current_location=wheelchair.current_position)
     """ ==== Show obstacles detected by LIDAR ==== """
     # show_obstacle_map(lidar.get_values(), measuring_distance=lidar.measuring_radius)
-    lidar.scan(grid, current_location=wheelchair.current_position)
     """=== Normalize Grid ==="""
     map.normalize_grid(grid) # inplace action
     skeleton = skeleton.astype(int)
     """=== Save Grids for providing multiple and different formats ==="""
     # map.save_grid(grid_filename, grid)
     # map.save_grid(skeleton_file_name, skeleton)
-    """=== Print map data === """
-    print(10*'='+f"Grid"+"="*10)
-    pprint(grid)
-    print(10 * '=' + f"Skeleton" + "=" * 10)
-    pprint(skeleton)
-    print(10 * '=' + f"Distances" + "=" * 10)
-    # pprint(distances)
-    # map.show_map(grid, skeleton, start_default, goal_default)
     """ === Path planning === """
     # absolute_path: np.array = map.get_path(grid=grid, start=start_default, goal=goal) # get list of waypoints
     # map.save_grid(path_file_name, absolute_path)
-    absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)
-    print(absolute_path)
+    absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)  # read predefined path
+    """=== Show map === """
     # map.show_map(grid=grid, skeleton=skeleton, path=absolute_path, start=start_default, goal=goal, save_path='./data_storage/images/images.png')
     # map.animate_path(absolute_path, grid, absolute_path, skeleton,
     #                  start=start_default, goal=goal,
     #                  animation_speed=5)
     iteration = 0
+    steps_taken = []
+    starting_time = time.time()
     for node in absolute_path:
-        starting_time = time.time()
-        wheelchair.move_to(target_node=node, grid=grid)
-        print(" TIME SPENT FOR MOVEMENT: ", time.time()-starting_time)
+        try:
+            wheelchair.move_to(target_node=node, grid=grid, show_map=False)
+        except:
+            break
+        steps_taken.append(wheelchair.current_position)
+    # show the path followed by the wheelchair
+    print(" TIME SPENT FOR MOVEMENT: ", time.time()-starting_time)
+    map.show_map(grid, skeleton, start=start_default, goal=steps_taken[-1], path=steps_taken)

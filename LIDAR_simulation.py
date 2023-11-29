@@ -13,8 +13,8 @@ def get_obstacle_vector(next_node: tuple, current_node: tuple) -> float:
     """
     Returns arctan between two points as radians
     """
-    y_diff = next_node[0] - current_node[1]
-    x_diff = next_node[1] - current_node[0]
+    y_diff = next_node[1] - current_node[1]
+    x_diff = next_node[0] - current_node[0]
     angle: float = math.atan2(y_diff, x_diff)
     return angle
 
@@ -88,7 +88,7 @@ class LIDAR:
             x, y = coor[0], coor[1] # get the coordinates x and y
             if grid[x, y] == 1: # if obstacle is detected
                 distance: float = np.sqrt((current_location[0] - x)**2 + (current_location[1] - y)**2)
-                angle:    float = get_obstacle_vector(current_node=current_location, next_node=(y, x))
+                angle:    float = get_obstacle_vector(current_node=current_location, next_node=(x, y))
                 record = (angle, distance) # compress the data into tuple
                 self.measurement_results.put(record)
         print('ENVIRONMENT HAS BEEN SCANNED')

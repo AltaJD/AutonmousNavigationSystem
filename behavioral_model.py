@@ -9,7 +9,8 @@ import config_extractor as config
 
 
 class WheelchairStatus(Enum):
-    """ An object contain different status of wheelchair
+    """
+    An object contain different status of wheelchair
     MOVING = performing maneuvering between two different points
     IDLE = no tasks has been given to the wheelchair
     WAITING = the task has not been finished and requires processing path plan or
@@ -42,7 +43,8 @@ class IntelligentWheelchair:
     lidar: LIDAR
 
     def __init__(self, current_position: tuple, current_angle: float, lidar: LIDAR):
-        """ Set the values by default, such as status of the wheelchair
+        """
+        Set the values by default, such as status of the wheelchair
         The position vector is essential to determine the next maneuver to be correctly calculated
         """
         self.status = WheelchairStatus.IDLE
@@ -59,18 +61,21 @@ class IntelligentWheelchair:
                f"Size (l,w, h):\t{(self.length, self.width, self.height)}\n"
 
     def show_current_position(self, map: np.array) -> None:
-        """The function is showing the recent location of wheelchair
+        """
+        The function is showing the recent location of wheelchair
         and presents on the map using plt
         """
         plt.imshow(map)
         plt.plot(self.current_position[0], self.current_position[1], 'rx')
         plt.show()
 
-    def move_to(self, target_node: tuple, grid: np.array) -> None:
-        """ The function is calculating the current position and vector
+    def move_to(self, target_node: tuple, grid: np.array, show_map=False) -> None:
+        """
+        The function is calculating the current position and vector
         to determine the rotation angle required and
         """
-        # get parameters required for vfh
+        # TODO: animate the path until the target node is reached
+        # get parameters required for vfh calculation
         sector_angle: int = config.get('sector_angle')  # degrees
         a, b = config.get('a'), config.get('b')
         distance_tolerance = config.get('distance_tolerance')  # in meters
@@ -82,23 +87,24 @@ class IntelligentWheelchair:
         """==== Path selection with lowest probability of obstacles ===="""
         histogram = get_vfh(measurements=self.lidar.get_values(), alpha=sector_angle, b=b)
         angle = get_rotation_angle(h=histogram,
-                                   threshold=0.0,
+                                   threshold=config.get('vfh_threshold'),
                                    current_node=previous_node,
                                    next_node=target_node)
         # update self steering direction and current node
         self.current_angle = float(angle)
-        distance = 1  # let's say every meter, the lidar starts to scan TODO: change
+        distance = get_distance(target_node, previous_node)  # on average, the wheelchair is moving 1 meter
         next_node = (distance * cos(radians(angle)) + previous_node[0],
                      distance * sin(radians(angle)) + previous_node[1])
         self.current_position = next_node
         self.lidar.scan(grid, current_location=self.current_position)
-        print(f"Current location\t {self.current_position}\n"
+        # show the result
+        print(f"Current location:\t {self.current_position}\n"
               f"Previous location:\t {previous_node}\n"
               f"Steering direction:\t {angle}")
-        show_histogram(h=histogram,
-                       grid=grid,
-                       current_location=self.current_position,
-                       steering_direction=self.current_angle)
+        if show_map: show_histogram(h=histogram,
+                                    grid=grid,
+                                    current_location=self.current_position,
+                                    steering_direction=self.current_angle)
         self.stop()
 
     def stop(self) -> None:
