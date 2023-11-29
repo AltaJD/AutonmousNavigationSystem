@@ -5,7 +5,6 @@ from LIDAR_simulation import LIDAR, get_obstacle_vector
 from behavioral_model import IntelligentWheelchair
 from typing import List
 from math import cos, sin
-from statistics import median
 import matplotlib.pyplot as plt
 
 """ === Functions to get Vector Field Histogram === """
@@ -211,9 +210,6 @@ def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
     # show magnitudes as percentages (from 0 to 1)
     highest_magnitude = max(histogram_smoothed)
     normalized_histogram = np.array([magnitude/highest_magnitude for magnitude in histogram_smoothed])
-    print('FINAL HISTOGRAM')
-    print(normalized_histogram) # TODO: remove
-    print(len(normalized_histogram))
     return normalized_histogram
 
 
@@ -229,7 +225,6 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
     # merge neighbor sectors
     merged_sectors: List[list] = []
     wide_sector = []
-    # TODO: optimize
     for i in range(len(obstacle_free_sectors) - 1):
         current_value = obstacle_free_sectors[i]
         next_value = obstacle_free_sectors[i+1]
@@ -250,15 +245,13 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
     if desired_angle < 0:
         desired_angle += 360
     desired_angle = np.floor(desired_angle/10)
-    print('DESIRED ANGLE: ', desired_angle) # TODO: remove
-    minimum_diff = 0
-    best_angle = 0
-    for i in range(1, len(obstacle_free_sectors)):
-        diff = abs(desired_angle-obstacle_free_sectors[i]*10)
-        if minimum_diff < diff:
-            minimum_diff = diff
-            best_angle = obstacle_free_sectors[i]
-    return best_angle # FIXME
+    print('DESIRED ANGLE: ', desired_angle*10) # TODO: remove print statements
+    print('OBSTACLE FREE SECTORS', obstacle_free_sectors, len(obstacle_free_sectors))
+    minimums_diff = list(map(lambda x: abs(x-desired_angle), obstacle_free_sectors))
+    best_angle = obstacle_free_sectors[minimums_diff.index(min(minimums_diff))]
+    print('Differences: ', minimums_diff, len(obstacle_free_sectors), minimums_diff.index(min(minimums_diff)))
+    print('BEST ANGLE: ', best_angle)
+    return best_angle
 
 
 if __name__ == '__main__':
@@ -268,7 +261,6 @@ if __name__ == '__main__':
     skeleton_file        = config.get('skeleton_save')
     grid: np.array       = mp.read_grid(file_path=grid_file, dtype=np.float)
     skeleton: np.array   = mp.read_grid(file_path=skeleton_file, dtype=np.int)
-    start_default: tuple = config.get('initial_position')
     goal_default:  tuple = config.get('final_position')
     """ Select the current position of the wheelchair """
     start_default = mp.select_point(grid, skeleton) # update starting position

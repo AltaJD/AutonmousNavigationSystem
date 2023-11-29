@@ -94,9 +94,9 @@ if __name__ == '__main__':
         lidar.scan(grid, current_location=next_node)
         print(f"Current location\t {wheelchair.current_position}\n"
               f"Previous location:\t {previous_node}\n"
-              f"Steering direction:\t {wheelchair.current_angle}")
+              f"Steering direction:\t {angle}")
         iteration += 1
-        if iteration % 5 == 0:
+        if iteration % 20 == 0:
             show_histogram(h=histogram,
                            grid=grid,
                            skeleton=skeleton,
