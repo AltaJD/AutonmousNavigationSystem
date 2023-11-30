@@ -119,6 +119,7 @@ def get_certainty_values(measurements: List[tuple]) -> np.array:
     where A is a measuring distance as an int
     The measurements include the coordinates (angle, distance) of the obstacles detected by the virtual LIDAR
     :returns the list with 1+distance: int and 0, where 1+distance is a certainty value of obstacle
+    otherwise, the [0] is returned
     """
     obstacle_magnitudes = []
     for value in measurements:
@@ -128,12 +129,16 @@ def get_certainty_values(measurements: List[tuple]) -> np.array:
         # assign 1+distance for obstacle and 0 as freeway
         # the certainty value based on the distance is assigned to the obstacle map
         obstacle_magnitudes.append(1+round(distance))
-    return np.array(obstacle_magnitudes)
+    if len(obstacle_magnitudes) > 0:
+        return np.array(obstacle_magnitudes)
+    return np.zeros(1, dtype=np.float)
 
 
 def smooth_histogram(h: List[int], l: int) -> np.array:
     """ Initial mapping may appear ragged and cause errors in the selection of the steering direction
     The function suggest to consider smooth the graph for better angle selection
+    Smoothing formula:
+    h[i] =
     :parameter
     h is a polar obstacle density
     l is a constant integer, chosen by experiment or simulation.
@@ -141,15 +146,16 @@ def smooth_histogram(h: List[int], l: int) -> np.array:
     :returns: smoothed polar obstacle density as List[float]
     """
     hist = np.array(h, dtype=int)
-    cumulative = 0 # cumulative sum
-    for k in range(hist.shape[0]-l):
-        for j in range(1, l):
-            multiplier = l-j+1
-            cumulative += (multiplier*h[k-j] + multiplier*h[k+j])
-        cumulative += l*h[k] # for j==0 which is always True
-        hist[k] = cumulative # update array
-        cumulative = 0 # reset
-    return hist
+    print(hist)
+    smoothed_data = []
+    # cumulative = 0 # cumulative sum
+    for i in range(len(hist)):
+        start_index = max(0, i - l + 1)
+        end_index = min(len(hist), i + l)
+        window = hist[start_index:end_index]
+        smoothed_value = sum(window) / len(window)
+        smoothed_data.append(smoothed_value)
+    return smoothed_data
 
 
 def get_sectors(measurements: List[tuple], magnitudes: np.array, alpha: float) -> List[int]:
@@ -158,28 +164,43 @@ def get_sectors(measurements: List[tuple], magnitudes: np.array, alpha: float) -
     :returns: polar obstacle density as np.array, dtype=int
     """
     # determine polar obstacle density h_k, where k is each sector divided by alpha
-    h_k = [] # List[int]
-    m_sum = 0 # sum of magnitudes per sector
+    h_k = []  # List[int]
+    m_sum = 0  # sum of magnitudes per sector
     # set initial/starting angle
     starting_angle: float = measurements[0][0]*180/np.pi # in degrees
     for i in range(len(measurements)):
-        beta: float = measurements[i][0] # get angle in radiance
-        beta = beta*180/np.pi # convert radiance to degrees
+        beta: float = measurements[i][0]  # get angle in radiance
+        beta = beta*180/np.pi  # convert radiance to degrees
         # determine sum of the magnitudes for particular sector
         if beta-starting_angle <= alpha:
-            m_sum += magnitudes[i] # if the magnitude is in the sector, we add it to the sum
+            m_sum += magnitudes[i]  # if the magnitude is in the sector, we add it to the sum
         else:
-            h_k.append(round(m_sum, 0)) # store the sector cumulative magnitude
-            m_sum = 0 # reset sum
-            starting_angle = beta # set the new starting angle for the sector in degrees
+            h_k.append(round(m_sum, 0))  # store the sector cumulative magnitude
+            m_sum = 0  # reset sum
+            starting_angle = beta  # set the new starting angle for the sector in degrees
     # expand the angle ranges from 0 to 360 degrees
-    initial_angle: float = measurements[0][0]*180/np.pi # degrees
+    initial_angle: float = measurements[0][0]*180/np.pi  # degrees
     if initial_angle < 0:
-        initial_angle += 360 # convert to the positive sign angle
-    sectors_num = int(360/alpha) # number of sectors
+        initial_angle += 360  # convert to the positive sign angle
+    sectors_num = int(360/alpha)  # number of sectors
     initial_sector = int(initial_angle/alpha) # starting sector
     normalized_histogram = expand_histogram(angles=h_k, max_size=sectors_num, starting_index=initial_sector)
     return normalized_histogram
+
+
+def get_magnitudes(certainty_values: np.array, a: int, b: int) -> np.array:
+    """ The magnitudes are calculated using: m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
+    The distances are included in the certainty values as (d[i][j] = c[i][j]-1)
+    """
+    # since the distance is included in the certainty values, it can be extracted as follows:
+    d: np.array = certainty_values.copy()  # distances
+    for i in range(d.shape[0]):
+        cell_value = d[i]
+        if cell_value > 0:
+            d[i] = cell_value - 1
+    if a is None:
+        a = b*max(d)
+    return (certainty_values**2)*(a-b*d)  # m[i][j]
 
 
 def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
@@ -195,21 +216,14 @@ def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
     alpha is an angle division that should be in degrees
     :returns np.array with shape: (n, 0)
     """
+
     c: np.array = get_certainty_values(measurements)
-    # since the distance is included in the certainty values, it can be extracted as follows:
-    d: np.array = c.copy() # distances
-    for i in range(d.shape[0]):
-        cell_value = d[i]
-        if cell_value > 0:
-            d[i] = cell_value - 1
-    if a is None:
-        a = b*max(d)
-    magnitudes: np.array = (c**2)*(a-b*d) # m[i][j]
-    histogram = get_sectors(measurements, magnitudes, alpha)
+    magnitudes  = get_magnitudes(c, a, b)
+    histogram   = get_sectors(measurements, magnitudes, alpha)
     histogram_smoothed = smooth_histogram(h=histogram, l=config.get('l'))
     # show magnitudes as percentages (from 0 to 1)
-    highest_magnitude = max(histogram_smoothed)
-    normalized_histogram = np.array([magnitude/highest_magnitude for magnitude in histogram_smoothed])
+    highest_magnitude    = max(histogram_smoothed)
+    normalized_histogram = np.array([magnitude/highest_magnitude if highest_magnitude != 0 else 0 for magnitude in histogram_smoothed])
     return normalized_histogram
 
 
@@ -222,6 +236,9 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
     """
     # determining angle that is the closest to the target point
     obstacle_free_sectors: List[int] = np.where(h <= threshold)[0]
+    print(obstacle_free_sectors)
+    print(h)
+    assert len(obstacle_free_sectors) > 0
     # merge neighbor sectors
     merged_sectors: List[list] = []
     wide_sector = []
@@ -276,12 +293,12 @@ if __name__ == '__main__':
     """ Show obstacles detected by LIDAR """
     # show_obstacle_mp(lidar.get_values(), measuring_distance=lidar.measuring_radius)
     """ Get Vector Field Histogram (VFH) """
-    sector_angle: int = 10 # degrees
-    a, b = 1, 1
+    sector_angle: int = config.get('sector_angle')  # degrees
+    a, b = config.get('a'), config.get('b')
     histogram = get_vfh(measurements=lidar.get_values(),
                         alpha=sector_angle, b=b)
     """ Path selection with lowest probability of obstacles """
-    angle = get_rotation_angle(h=histogram, threshold=0.0)
+    angle = get_rotation_angle(h=histogram, threshold=config.get('vfh_threshold'))
     print('NEXT ROTATION ANGLE and VALUE')
     print(angle)
     wheelchair.current_angle = float(angle) # update wheelchair steering direction

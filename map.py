@@ -155,14 +155,6 @@ def a_star(grid, h, start, goal):
     return path[::-1], path_cost
 
 
-def smooth_path(path: np.array, grid: np.array) -> np.array:
-    """
-    The absolute path from A* may include many rotations. To simplify the movement, we need to determine
-    more simple and intuitive path for the user
-    """
-    return path
-
-
 def get_path(grid, start, goal) -> np.array:
     start_time = time.time()
     path, waypoints = a_star(grid=grid, h=heuristic_func, start=start, goal=goal)
@@ -312,7 +304,7 @@ def animate_path(path: np.array,
     plt.show()
 
 
-def select_point(grid: np.array, skeleton: np.array, start=None, goal=None) -> tuple:
+def select_point(grid: np.array, skeleton: np.array, start=None, goal=None, title='') -> tuple:
     """ Show the 2D environment map for selection of coordinates by mouse click
     :returns (y, x) coordinates of the map
     """
@@ -330,6 +322,7 @@ def select_point(grid: np.array, skeleton: np.array, start=None, goal=None) -> t
         ax.plot(goal[1], goal[0], 'rx')
     # Show
     plt.show(block=False)
+    plt.title(title)
 
     # Wait for the user to click on the figure
     points = plt.ginput(n=1, timeout=-1)

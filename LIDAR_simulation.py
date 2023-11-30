@@ -5,7 +5,6 @@ from queue import Queue
 import time
 import numpy as np
 import math
-from pprint import pprint
 import matplotlib.pyplot as plt
 
 
@@ -15,13 +14,16 @@ def get_obstacle_vector(next_node: tuple, current_node: tuple) -> float:
     """
     y_diff = next_node[1] - current_node[1]
     x_diff = next_node[0] - current_node[0]
-    angle: float = math.atan2(y_diff, x_diff)
-    return angle
+    return math.atan2(y_diff, x_diff)
 
 
 def get_distance(next_node: tuple, current_node: tuple) -> float:
-    """ Return Euclidean distance between nodes in meters """
-    return np.sqrt( (next_node[0]-current_node[0])**2 + (next_node[1]-current_node[1])**2 )
+    """
+    Return Euclidean distance between nodes in meters
+    """
+    x_diff = next_node[0]-current_node[0]
+    y_diff = next_node[1]-current_node[1]
+    return np.sqrt(x_diff**2 + y_diff**2)
 
 
 class LIDAR:
@@ -31,8 +33,8 @@ class LIDAR:
     FIFO (First-In-First-Out)
     """
 
-    measuring_radius: int # radius is given in meters
-    measurement_results: Queue # queue of tuples (angle: float, distance: float)
+    measuring_radius: int  # radius is given in meters
+    measurement_results: Queue  # queue of tuples (angle: float, distance: float)
 
     def __init__(self, radius: int):
         self.measuring_radius = radius
@@ -56,6 +58,8 @@ class LIDAR:
             data.append(self.measurement_results.get())
         print('='*5+f'LIDAR DATA RECEIVED {time.time()-start_time}'+'='*5)
         data.sort() # sort by angle in ascending order
+        if len(data) == 0:
+            return [(0, 0)]
         return data
 
     def get_scanning_area(self, grid: np.array, current_node: tuple) -> np.array:

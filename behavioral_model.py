@@ -74,7 +74,6 @@ class IntelligentWheelchair:
         The function is calculating the current position and vector
         to determine the rotation angle required and
         """
-        # TODO: animate the path until the target node is reached
         # get parameters required for vfh calculation
         sector_angle: int = config.get('sector_angle')  # degrees
         a, b = config.get('a'), config.get('b')

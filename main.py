@@ -33,8 +33,9 @@ if __name__ == '__main__':
     grid     = map.read_grid(file_path=grid_filename, dtype=np.float)
     skeleton = map.read_grid(file_path=skeleton_file_name, dtype=np.int)
     # select start or goal locations
-    # goal = map.select_point(grid, skeleton, start_default)
-    goal = goal_default
+    goal          = map.select_point(grid, skeleton, title='Select the destination')
+    start_default = map.select_point(grid, skeleton, title='Select the initial point')
+    # goal = goal_default
     print(goal)
     if not map.valid_destination(grid, start_default, goal):
         map.show_map(grid, skeleton, start_default, goal)
@@ -49,13 +50,13 @@ if __name__ == '__main__':
     """=== Normalize Grid ==="""
     map.normalize_grid(grid) # inplace action
     skeleton = skeleton.astype(int)
+    """ === Path planning === """
+    absolute_path: np.array = map.get_path(grid=grid, start=start_default, goal=goal) # get list of waypoints
     """=== Save Grids for providing multiple and different formats ==="""
     # map.save_grid(grid_filename, grid)
     # map.save_grid(skeleton_file_name, skeleton)
-    """ === Path planning === """
-    # absolute_path: np.array = map.get_path(grid=grid, start=start_default, goal=goal) # get list of waypoints
     # map.save_grid(path_file_name, absolute_path)
-    absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)  # read predefined path
+    # absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)  # read predefined path
     """=== Show map === """
     # map.show_map(grid=grid, skeleton=skeleton, path=absolute_path, start=start_default, goal=goal, save_path='./data_storage/images/images.png')
     # map.animate_path(absolute_path, grid, absolute_path, skeleton,
@@ -65,11 +66,9 @@ if __name__ == '__main__':
     steps_taken = []
     starting_time = time.time()
     for node in absolute_path:
-        try:
-            wheelchair.move_to(target_node=node, grid=grid, show_map=False)
-        except:
-            break
+        wheelchair.move_to(target_node=node, grid=grid, show_map=False)
         steps_taken.append(wheelchair.current_position)
     # show the path followed by the wheelchair
     print(" TIME SPENT FOR MOVEMENT: ", time.time()-starting_time)
-    map.show_map(grid, skeleton, start=start_default, goal=steps_taken[-1], path=steps_taken)
+    map.animate_path(path=np.array(steps_taken), grid=grid, skeleton=skeleton)
+    print('FINAL DESTINATION: ', {absolute_path[-1]})
