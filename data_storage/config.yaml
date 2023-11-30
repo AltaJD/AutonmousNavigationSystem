@@ -1,12 +1,12 @@
 initial_position: [25, 100] # default position for testing
 final_position: [650, 530] # default position for testing
 
-wheelchair_length: 0.7 # 70 cm
-wheelchair_width: 0.3 # 30 cm
+wheelchair_length: 0.7 # in meters
+wheelchair_width: 0.3 # in meters
 
 safety_distance: 0.5 # how close the wheelchair can approach obstacles
 lidar_radius: 30 # get the scanning range in meters
-distance_tolerance: 0.1 # in meters
+distance_tolerance: 0.5 # in meters
 
 colliders: './data_storage/colliders.csv'
 grid_save: './data_storage/grid.csv'
@@ -14,8 +14,8 @@ skeleton_save: './data_storage/skeleton.csv'
 path_save: './data_storage/path.csv'
 
 # VFH config
-sector_angle: 5
+sector_angle: 1
 a: 1
 b: 1
-l: 3 # max is 18
-vfh_threshold: 0.3
+l: 6 # max is 18
+vfh_threshold: 0.05

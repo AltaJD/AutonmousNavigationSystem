@@ -8,7 +8,7 @@ import math
 import matplotlib.pyplot as plt
 
 
-def get_obstacle_vector(next_node: tuple, current_node: tuple) -> float:
+def get_vector_angle(next_node: tuple, current_node: tuple) -> float:
     """
     Returns arctan between two points as radians
     """
@@ -76,8 +76,6 @@ class LIDAR:
         indices_within_radius = np.where(distances <= self.measuring_radius)
         # Get the coordinates of the cells within the radius
         coordinates_within_radius = np.transpose(indices_within_radius)
-        # print('SCANNING AREA COORDINATES') # TODO: remove
-        # pprint(coordinates_within_radius)
         return coordinates_within_radius
 
     def scan(self, grid: np.array, current_location: tuple) -> None:
@@ -92,7 +90,7 @@ class LIDAR:
             x, y = coor[0], coor[1] # get the coordinates x and y
             if grid[x, y] == 1: # if obstacle is detected
                 distance: float = np.sqrt((current_location[0] - x)**2 + (current_location[1] - y)**2)
-                angle:    float = get_obstacle_vector(current_node=current_location, next_node=(x, y))
+                angle:    float = get_vector_angle(current_node=current_location, next_node=(x, y))
                 record = (angle, distance) # compress the data into tuple
                 self.measurement_results.put(record)
         print('ENVIRONMENT HAS BEEN SCANNED')

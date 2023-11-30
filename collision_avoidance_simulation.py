@@ -1,7 +1,7 @@
 import config_extractor as config
 import map as mp
 import numpy as np
-from LIDAR_simulation import LIDAR, get_obstacle_vector
+from LIDAR_simulation import LIDAR, get_vector_angle
 from typing import List
 from math import cos, sin
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 """ === Functions to get Vector Field Histogram === """
 
 
-def show_histogram(h: np.array, grid: np.array, current_location: tuple, steering_direction=None, skeleton=None) -> None:
+def show_histogram(h: np.array, current_location: tuple, steering_direction=None, skeleton=None, grid=None, target_node=None) -> None:
     """
     The function is using plt to plot the histogram and
     the map of the environment as subplots
@@ -26,20 +26,22 @@ def show_histogram(h: np.array, grid: np.array, current_location: tuple, steerin
     ax1.set_ylabel('Probability')
     ax1.set_title('Vector Field Histogram')
     # plot grid
-    ax2.imshow(grid, origin='lower')
-    if skeleton: ax2.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
-    ax2.set_xlabel('North')
-    ax2.set_ylabel('East')
-    ax2.set_title('Environment map')
-    # show the current location
-    ax2.plot(current_location[1], current_location[0], 'rx')
+    if grid is not None:
+        ax2.imshow(grid, origin='lower')
+        if skeleton: ax2.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+        ax2.set_xlabel('North')
+        ax2.set_ylabel('East')
+        ax2.set_title('Environment map')
+        # show the current location
+        ax2.plot(current_location[1], current_location[0], 'rx')
+        ax2.figure.set_size_inches(10, 10)
     # show 0 angle vector
     plt.quiver(current_location[1], current_location[0], sin(0) * 1, cos(0) * 1, color='r')
     # show the steering direction
     if steering_direction: plt.quiver(current_location[1], current_location[0],
                                       sin(np.radians(steering_direction)), cos(np.radians(steering_direction)),
                                       color='b')
-    ax2.figure.set_size_inches(10, 10)
+    if target_node: plt.plot(target_node[1], target_node[0], 'gx')
     # adjusting spacing between subplots
     plt.tight_layout()
     plt.show()
@@ -137,8 +139,6 @@ def get_certainty_values(measurements: List[tuple]) -> np.array:
 def smooth_histogram(h: List[int], l: int) -> np.array:
     """ Initial mapping may appear ragged and cause errors in the selection of the steering direction
     The function suggest to consider smooth the graph for better angle selection
-    Smoothing formula:
-    h[i] =
     :parameter
     h is a polar obstacle density
     l is a constant integer, chosen by experiment or simulation.
@@ -146,7 +146,6 @@ def smooth_histogram(h: List[int], l: int) -> np.array:
     :returns: smoothed polar obstacle density as List[float]
     """
     hist = np.array(h, dtype=int)
-    print(hist)
     smoothed_data = []
     # cumulative = 0 # cumulative sum
     for i in range(len(hist)):
@@ -227,7 +226,7 @@ def get_vfh(measurements: List[tuple], alpha: int, b: int, a=None) -> np.array:
     return normalized_histogram
 
 
-def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold=0.0) -> int:
+def get_rotation_angle(h: np.array, current_node: tuple, next_node=None, threshold=0.0) -> int:
     """ Get the angle with the lowest probability of the obstacles ahead 
     :param h is histogram represented as np.array with a shape (n, 0)
     :param threshold in % specifies the minimum obstacle probability acceptable as obstacle-free path
@@ -236,8 +235,6 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
     """
     # determining angle that is the closest to the target point
     obstacle_free_sectors: List[int] = np.where(h <= threshold)[0]
-    print(obstacle_free_sectors)
-    print(h)
     assert len(obstacle_free_sectors) > 0
     # merge neighbor sectors
     merged_sectors: List[list] = []
@@ -257,19 +254,15 @@ def get_rotation_angle(h: np.array, next_node=None, current_node=None, threshold
             wide_sector.append(current_value)
             merged_sectors.append(wide_sector)
             wide_sector = []
-    desired_angle = get_obstacle_vector(next_node=next_node, current_node=current_node)*180/np.pi
+    desired_angle = get_vector_angle(next_node=next_node, current_node=current_node) * 180 / np.pi
     # select the angle closest to the desired angle
     if desired_angle < 0:
         desired_angle += 360
     desired_angle = np.floor(desired_angle/config.get('sector_angle'))
-    print('DESIRED ANGLE: ', desired_angle*config.get('sector_angle')) # TODO: remove print statements
-    # print('OBSTACLE FREE SECTORS', obstacle_free_sectors, len(obstacle_free_sectors))
     minimums_diff = list(map(lambda x: abs(x-desired_angle), obstacle_free_sectors))
     best_angle = obstacle_free_sectors[minimums_diff.index(min(minimums_diff))]
     # convert angle to degrees
     best_angle *= config.get('sector_angle')
-    # print('Differences: ', minimums_diff, len(obstacle_free_sectors), minimums_diff.index(min(minimums_diff)))
-    # print('BEST ANGLE: ', best_angle)
     return best_angle
 
 
@@ -298,7 +291,8 @@ if __name__ == '__main__':
     histogram = get_vfh(measurements=lidar.get_values(),
                         alpha=sector_angle, b=b)
     """ Path selection with lowest probability of obstacles """
-    angle = get_rotation_angle(h=histogram, threshold=config.get('vfh_threshold'))
+    angle = get_rotation_angle(h=histogram, threshold=config.get('vfh_threshold'),
+                               current_node=wheelchair.current_position)
     print('NEXT ROTATION ANGLE and VALUE')
     print(angle)
     wheelchair.current_angle = float(angle) # update wheelchair steering direction

@@ -4,8 +4,9 @@ from typing import Optional, Tuple
 from enum import Enum
 from collision_avoidance_simulation import get_vfh, get_rotation_angle, show_histogram
 from math import sin, cos, radians
-from LIDAR_simulation import LIDAR, get_distance
+from LIDAR_simulation import LIDAR, get_distance, get_vector_angle
 import config_extractor as config
+import time
 
 
 class WheelchairStatus(Enum):
@@ -39,7 +40,7 @@ class IntelligentWheelchair:
     width: float
     height: Optional[float]
     battery_level: float
-    status: WheelchairStatus
+    status: str
     lidar: LIDAR
 
     def __init__(self, current_position: tuple, current_angle: float, lidar: LIDAR):
@@ -47,7 +48,7 @@ class IntelligentWheelchair:
         Set the values by default, such as status of the wheelchair
         The position vector is essential to determine the next maneuver to be correctly calculated
         """
-        self.status = WheelchairStatus.IDLE
+        self.status = WheelchairStatus.IDLE.value
         self.current_position = current_position  # (y, x)
         self.current_angle = current_angle
         self.lidar = lidar
@@ -74,32 +75,46 @@ class IntelligentWheelchair:
         The function is calculating the current position and vector
         to determine the rotation angle required and
         """
-        # get parameters required for vfh calculation
+        # get parameters required for vfh calculation FIXME
         sector_angle: int = config.get('sector_angle')  # degrees
         a, b = config.get('a'), config.get('b')
         distance_tolerance = config.get('distance_tolerance')  # in meters
+        vfh_threshold: float = config.get('vfh_threshold')
 
-        previous_node = self.current_position
-        self.status = WheelchairStatus.MOVING
-        # reached_target: bool = (get_distance(target_node, self.current_position) < distance_tolerance)
-        # while not reached_target:
-        """==== Path selection with lowest probability of obstacles ===="""
-        histogram = get_vfh(measurements=self.lidar.get_values(), alpha=sector_angle, b=b)
-        angle = get_rotation_angle(h=histogram,
-                                   threshold=config.get('vfh_threshold'),
-                                   current_node=previous_node,
-                                   next_node=target_node)
-        # update self steering direction and current node
-        self.current_angle = float(angle)
-        distance = get_distance(target_node, previous_node)  # on average, the wheelchair is moving 1 meter
-        next_node = (distance * cos(radians(angle)) + previous_node[0],
-                     distance * sin(radians(angle)) + previous_node[1])
-        self.current_position = next_node
-        self.lidar.scan(grid, current_location=self.current_position)
-        # show the result
-        print(f"Current location:\t {self.current_position}\n"
-              f"Previous location:\t {previous_node}\n"
-              f"Steering direction:\t {angle}")
+        start_time = time.time()
+        self.status = WheelchairStatus.MOVING.value
+        reached_target: bool = (get_distance(target_node, self.current_position) < distance_tolerance)
+        # target_reachable: bool = histogram[int(get_vector_angle(target_node, self.current_position)/config.get('sector_angle'))] > vfh_threshold
+
+        while not reached_target:
+            """==== Path selection with lowest probability of obstacles ===="""
+            histogram = get_vfh(measurements=self.lidar.get_values(), alpha=sector_angle, b=b)
+            angle     = get_rotation_angle(h=histogram, threshold=vfh_threshold,
+                                           current_node=self.current_position,
+                                           next_node=target_node)
+            if round(abs(angle-self.current_angle)) == 180:
+                break
+            distance = get_distance(target_node, self.current_position)  # on average, the wheelchair is moving 1 meter
+            next_node = (distance * cos(radians(angle)) + self.current_position[0],
+                         distance * sin(radians(angle)) + self.current_position[1])
+            # update self steering direction and current node
+            self.current_position = next_node
+            self.current_angle = float(angle)
+            self.lidar.scan(grid, current_location=self.current_position)
+            reached_target: bool = (distance < distance_tolerance)
+            print('DISTANCE', round(distance, 2))
+            time_diff = time.time()-start_time
+            if time_diff > 10:
+                show_histogram(h=histogram,
+                               grid=grid,
+                               current_location=self.current_position,
+                               steering_direction=self.current_angle)
+                start_time = time.time()
+            # show the result
+            print(f"Current location:\t {self.current_position}\n"
+                  f"Target location:\t {target_node}\n"
+                  f"Steering direction:\t {self.current_angle}")
+
         if show_map: show_histogram(h=histogram,
                                     grid=grid,
                                     current_location=self.current_position,
@@ -107,7 +122,7 @@ class IntelligentWheelchair:
         self.stop()
 
     def stop(self) -> None:
-        self.status = WheelchairStatus.WAITING
+        self.status = WheelchairStatus.WAITING.value
         pass
 
 

@@ -335,11 +335,27 @@ def select_point(grid: np.array, skeleton: np.array, start=None, goal=None, titl
     return location
 
 
-def add_obstacles(grid: np.array, obstacle) -> None:
+def add_obstacles(grid: np.array, n: int) -> None:
     """ The function add the obstacle locations to the main map
     and save the new map to the csv file.
     It allows to test the obstacle avoidance system and A* algorithm,
     in case no maneuvers are available
     """
-    # TODO: add method
-    pass
+    # Get the dimensions of the grid TODO: test
+    indices = np.argwhere(grid == 0)
+
+    # If there are fewer available indices than the desired number of obstacles, return the grid as is
+    if len(indices) < n:
+        return grid
+
+    # Randomly select n indices from the available indices
+    selected_indices = np.random.choice(len(indices), n, replace=False)
+    selected_coordinates: np.array = indices[selected_indices]
+
+    # Set the selected indices to 1
+    for coord in selected_coordinates:
+        x, y = coord[0], coord[1]
+        grid[(x+1, y+1)] = 1
+        grid[(x+1, y)]   = 1
+        grid[(x, y+1)]   = 1
+        grid[(x, y)]     = 1

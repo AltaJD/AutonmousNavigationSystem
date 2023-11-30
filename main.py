@@ -58,7 +58,9 @@ if __name__ == '__main__':
     # map.save_grid(path_file_name, absolute_path)
     # absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)  # read predefined path
     """=== Show map === """
-    # map.show_map(grid=grid, skeleton=skeleton, path=absolute_path, start=start_default, goal=goal, save_path='./data_storage/images/images.png')
+    map.add_obstacles(grid, n=200)
+
+    map.show_map(grid=grid, skeleton=skeleton, path=absolute_path, start=start_default, goal=goal, save_path='./data_storage/images/images.png')
     # map.animate_path(absolute_path, grid, absolute_path, skeleton,
     #                  start=start_default, goal=goal,
     #                  animation_speed=5)
@@ -71,4 +73,4 @@ if __name__ == '__main__':
     # show the path followed by the wheelchair
     print(" TIME SPENT FOR MOVEMENT: ", time.time()-starting_time)
     map.animate_path(path=np.array(steps_taken), grid=grid, skeleton=skeleton)
-    print('FINAL DESTINATION: ', {absolute_path[-1]})
+    print('FINAL DESTINATION: ', absolute_path[-1])
