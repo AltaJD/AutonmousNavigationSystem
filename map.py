@@ -341,7 +341,7 @@ def add_obstacles(grid: np.array, n: int) -> None:
     It allows to test the obstacle avoidance system and A* algorithm,
     in case no maneuvers are available
     """
-    # Get the dimensions of the grid TODO: test
+    # Get the dimensions of the grid
     indices = np.argwhere(grid == 0)
 
     # If there are fewer available indices than the desired number of obstacles, return the grid as is
@@ -352,9 +352,13 @@ def add_obstacles(grid: np.array, n: int) -> None:
     selected_indices = np.random.choice(len(indices), n, replace=False)
     selected_coordinates: np.array = indices[selected_indices]
 
+    x_offset, y_offset = grid.shape[1], grid.shape[0]
+
     # Set the selected indices to 1
     for coord in selected_coordinates:
         x, y = coord[0], coord[1]
+        if x+1 >= x_offset or y+1 >= y_offset:
+            continue
         grid[(x+1, y+1)] = 1
         grid[(x+1, y)]   = 1
         grid[(x, y+1)]   = 1
