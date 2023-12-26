@@ -114,15 +114,12 @@ def a_star(grid, h, start, goal):
     queue = PriorityQueue()
     queue.put((0, start))
     visited = set(start)
-
     branch = {}
     found = False
-
     while not queue.empty():
         item = queue.get()
         current_cost = item[0]
         current_node = item[1]
-
         if current_node == goal:
             print('Found a path.')
             found = True
@@ -137,12 +134,10 @@ def a_star(grid, h, start, goal):
                 if next_node not in visited:
                     visited.add(next_node)
                     queue.put((new_cost, next_node))
-
                     branch[next_node] = (new_cost, current_node, action)
     path = []
     path_cost = 0
     if found:
-
         # retrace steps
         path = []
         n = goal
@@ -151,7 +146,6 @@ def a_star(grid, h, start, goal):
             path.append(branch[n][2])
             n = branch[n][1]
         path.append(branch[n][2])
-
     return path[::-1], path_cost
 
 
@@ -301,6 +295,20 @@ def animate_path(path: np.array,
         print('='*5+f'ANIMATED PATH HAS BEEN SAVED'+'='*5)
 
     # Display the animation
+    plt.show()
+
+
+def show_paths(initial_path: np.array, path_taken: np.array, grid=None, skeleton=None) -> None:
+    """ The function shows two different paths to estimate performance """
+    # show obstacles
+    if grid is not None:
+        plt.imshow(grid, origin='lower')
+    if skeleton is not None:
+        plt.imshow(skeleton, cmap='Greys', origin='lower', alpha=0.7)
+    # show path 1
+    plt.plot(initial_path[:, 1], initial_path[:, 0], 'g')
+    # show path 2
+    plt.plot(path_taken[:, 1], path_taken[:, 0], 'r')
     plt.show()
 
 

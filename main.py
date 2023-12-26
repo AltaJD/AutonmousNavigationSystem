@@ -1,15 +1,14 @@
 import numpy as np
 import map
-from pprint import pprint
-import config_extractor as config
+import config as config
 from behavioral_model import IntelligentWheelchair
 import LIDAR_simulation
 import sys
 import time
 
 
-if __name__ == '__main__':
-    """ === Get configuration === 
+def main():
+    """ === Get configuration ===
     It includes default data for testing the system, such as:
     1. Start coordinate
     2. Goal coordinate
@@ -59,7 +58,6 @@ if __name__ == '__main__':
     # absolute_path: np.array = map.read_grid(file_path=path_file_name, dtype=np.int)  # read predefined path
     """=== Show map === """
     map.add_obstacles(grid, n=200)
-
     map.show_map(grid=grid, skeleton=skeleton, path=absolute_path, start=start_default, goal=goal, save_path='./data_storage/images/images.png')
     # map.animate_path(absolute_path, grid, absolute_path, skeleton,
     #                  start=start_default, goal=goal,
@@ -72,5 +70,13 @@ if __name__ == '__main__':
         steps_taken.append(wheelchair.current_position)
     # show the path followed by the wheelchair
     print(" TIME SPENT FOR MOVEMENT: ", time.time()-starting_time)
-    map.animate_path(path=np.array(steps_taken), grid=grid, skeleton=skeleton)
-    print('FINAL DESTINATION: ', absolute_path[-1])
+    passed_waypoints = np.array(steps_taken)
+    map.animate_path(path=passed_waypoints, grid=grid, skeleton=skeleton)
+    print('PATHS:')
+    print(passed_waypoints)
+    print(absolute_path)
+    map.show_paths(absolute_path, passed_waypoints, grid, skeleton)
+
+
+if __name__ == '__main__':
+    main()

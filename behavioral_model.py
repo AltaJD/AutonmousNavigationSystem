@@ -5,7 +5,7 @@ from enum import Enum
 from collision_avoidance_simulation import get_vfh, get_rotation_angle, show_histogram
 from math import sin, cos, radians
 from LIDAR_simulation import LIDAR, get_distance, get_vector_angle
-import config_extractor as config
+import config as config
 import time
 
 

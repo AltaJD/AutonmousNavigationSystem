@@ -1,4 +1,4 @@
-import config_extractor as config
+import config as config
 import map as mp
 import numpy as np
 from LIDAR_simulation import LIDAR, get_vector_angle
