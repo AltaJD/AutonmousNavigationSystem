@@ -7,6 +7,7 @@ wheelchair_width: 0.3 # in meters
 safety_distance: 0.5 # how close the wheelchair can approach obstacles
 lidar_radius: 30 # get the scanning range in meters
 distance_tolerance: 0.5 # in meters
+map_figure_size: 12
 
 colliders: './data_storage/colliders.csv'
 grid_save: './data_storage/grid.csv'
