@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 from enum import Enum
 from collision_avoidance_simulation import VFH
 from math import sin, cos, radians
-from LIDAR_simulation import LIDAR, get_distance
+from lidar_simulation import LidarSimulation, get_distance
 import time
 from map import Map
 import config
@@ -35,7 +35,7 @@ class IntelligentWheelchair:
     for different services
     """
     map: Map
-    lidar: LIDAR
+    lidar: LidarSimulation
     name: Optional[str]
     current_position: Tuple[float, float]  # (y, x)
     current_angle: float  # in degrees
@@ -47,7 +47,7 @@ class IntelligentWheelchair:
     battery_level: float
     status: str
 
-    def __init__(self, current_position: tuple, current_angle: float, lidar: LIDAR, env: Map):
+    def __init__(self, current_position: tuple, current_angle: float, lidar: LidarSimulation, env: Map):
         """
         Set the values by default, such as status of the wheelchair
         The position vector is essential to determine the next maneuver to be correctly calculated

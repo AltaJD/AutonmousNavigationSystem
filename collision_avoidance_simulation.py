@@ -1,6 +1,8 @@
+import threading
+
 from map import Map
 import numpy as np
-from LIDAR_simulation import LIDAR, get_vector_angle
+from lidar_simulation import get_vector_angle
 from typing import List
 from math import cos, sin
 import matplotlib.pyplot as plt
@@ -8,7 +10,6 @@ import config
 
 
 class VFH:
-    map: Map
     desired_direction: float    # represents the angle from current node to target node
     steering_direction: float
     measurements: List[tuple]
@@ -20,15 +21,26 @@ class VFH:
     alpha: int
     l: int
 
-    def __init__(self, env: Map, threshold: float, lidar_measurements: List[tuple],
+    def __init__(self, threshold: float,
                  a, b, alpha, l_param):
-        self.measurements = lidar_measurements
+        """
+        :param threshold:
+        :param lidar_measurements:
+        :param a:
+        :param b:
+        :param alpha:
+        :param l_param:
+        """
         self.threshold = threshold
         self.alpha = alpha
-        self.map = env
         self.a = a
         self.b = b
         self.l = l_param
+        # set up figure instance
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        self.fig = fig
+        self.ax1 = ax1
+        self.ax2 = ax2
 
     def update_measurements(self, values: List[tuple]):
         self.measurements = values
@@ -225,44 +237,36 @@ class VFH:
         assert len(expanded_list) == max_size
         return expanded_list
 
-    def show_histogram(self, current_node: tuple, target_node=None) -> None:
+    def show_histogram(self, current_node=None, target_node=None, env=None) -> None:
         """
         The function is using plt to plot the histogram and
         the map of the environment as subplots
         The current location is indicated as a cross
         The steering direction is indicated as a blue vector passed in degrees
          """
-        # get subplot objects ax1 and ax2
-        fig, (ax1, ax2) = plt.subplots(2, 1)
         # get x axis for histogram
         x = np.arange(self.histogram.shape[0]) * config.get('sector_angle')
         # plot histogram
-        ax1.bar(x, self.histogram)
-        ax1.set_xlabel('Angle (in degrees)')
-        ax1.set_ylabel('Probability')
-        ax1.set_title('Vector Field Histogram')
-        # plot grid
-        ax2.imshow(self.map.grid, origin='lower')
-        ax2.imshow(self.map.skeleton, cmap='Greys', origin='lower', alpha=0.7)
-        ax2.set_xlabel('North')
-        ax2.set_ylabel('East')
-        ax2.set_title('Environment map')
-        # show the current location
-        ax2.plot(current_node[1], current_node[0], 'rx')
-        ax2.figure.set_size_inches(10, 10)
-        # show 0 angle vector
-        plt.quiver(current_node[1], current_node[0], sin(0) * 1, cos(0) * 1, color='r')
-        # show the steering direction
-        plt.quiver(current_node[1], current_node[0],
-                   sin(np.radians(self.steering_direction)),
-                   cos(np.radians(self.steering_direction)),
-                   color='b')
-        if target_node: plt.plot(target_node[1], target_node[0], 'gx')
+        self.ax1.bar(x, self.histogram)
+        self.ax1.set_xlabel('Angle (in degrees)')
+        self.ax1.set_ylabel('Probability')
+        self.ax1.set_title('Vector Field Histogram')
+        if env is not None and current_node is not None: self.show_map(self.ax2, env, current_node)
+        if target_node is not None:
+            plt.plot(target_node[1], target_node[0], 'gx')
+            # show 0 angle vector
+            plt.quiver(current_node[1], current_node[0], sin(0) * 1, cos(0) * 1, color='r')
+            # show the steering direction
+            plt.quiver(current_node[1], current_node[0],
+                       sin(np.radians(self.steering_direction)),
+                       cos(np.radians(self.steering_direction)),
+                       color='b')
         # adjusting spacing between subplots
         plt.tight_layout()
-        plt.show()
+        # Update the plot
+        plt.pause(1)  # Add a small delay (e.g., 0.1 seconds)
 
-    def show_obstacle_map(self, measuring_distance: int) -> None:
+    def get_obstacle_map(self, measuring_distance: int):
         """
         The function determine the location of the obstacles and create virtual AxA map of their locations,
         where A is a measuring distance as an int
@@ -283,30 +287,46 @@ class VFH:
             # assign 1+distance for obstacle and 0 as freeway
             # the certainty value based on the distance is assigned to the obstacle map
             obstacle_grid[location_y][location_x] = 1 + round(distance)
-        print("OBSTACLE GRID")
-        print(obstacle_grid)
-        plt.imshow(obstacle_grid, cmap='Greys', origin='lower', alpha=0.7)
+        return obstacle_grid
+
+    def show_obstacle_map(self, measuring_distance: int) -> None:
+        plt.imshow(self.get_obstacle_map(measuring_distance), cmap='Greys', origin='lower', alpha=0.7)
         plt.show()
 
+    @staticmethod
+    def show_map(ax2, env: Map, current_node: tuple) -> None:
+        # plot grid
+        ax2.imshow(env.grid, origin='lower')
+        ax2.imshow(env.skeleton, cmap='Greys', origin='lower', alpha=0.7)
+        ax2.set_xlabel('North')
+        ax2.set_ylabel('East')
+        ax2.set_title('Environment map')
+        # show the current location
+        ax2.plot(current_node[1], current_node[0], 'rx')
+        ax2.figure.set_size_inches(10, 10)
 
-if __name__ == '__main__':
-    import config
-    """ Retrieve testing data """
-    filename:           str     = config.get('colliders')
-    safety_distance:    float   = config.get('safety_distance')
-    start_default:      tuple   = config.get('initial_position')
-    goal_default:       tuple = config.get('final_position')
-    lidar_radius:       int     = config.get('lidar_radius')
 
+def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goal: tuple) -> None:
+    # test with simulation Lidar
+    from lidar_simulation import LidarSimulation
     map_2d = Map(filename=filename, size=12, safety_distance=safety_distance)
-    lidar_simulation = LIDAR(radius=config.get('lidar_radius'))
-    lidar_simulation.scan(grid=map_2d.grid, current_location=start_default)
-    vfh = VFH(env=map_2d,
-              a=config.get('a'),
+    lidar_simulation = LidarSimulation(radius=config.get('lidar_radius'))
+    lidar_simulation.scan(grid=map_2d.grid, current_location=start)
+    vfh = VFH(a=config.get('a'),
               b=config.get('b'),
               alpha=config.get('sector_angle'),
               l_param=config.get('l'),
-              threshold=config.get('vfh_threshold'),
-              lidar_measurements=lidar_simulation.get_values())
-    vfh.get_rotation_angle(current_node=start_default, next_node=goal_default)
-    vfh.show_histogram(current_node=start_default)
+              threshold=config.get('vfh_threshold'))
+    vfh.update_measurements(lidar_simulation.get_values())
+    vfh.get_rotation_angle(current_node=start, next_node=goal)
+    vfh.show_histogram(current_node=start, env=map_2d)
+
+
+if __name__ == '__main__':
+    """ Retrieve testing data """
+    start_default:      tuple   = config.get('initial_position')
+    file_name:          str     = config.get('colliders')
+    safety_distance:    int     = config.get('safety_distance')
+    goal_default:       tuple   = config.get('final_position')
+
+    test_simulation_lidar(start_default, file_name, safety_distance, goal_default)

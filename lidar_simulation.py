@@ -26,7 +26,7 @@ def get_distance(next_node: tuple, current_node: tuple) -> float:
     return np.sqrt(x_diff**2 + y_diff**2)
 
 
-class LIDAR:
+class LidarSimulation:
 
     """ The object will contain measurement results as an angle and distance toward obstacle
     The real LIDAR system is scanning the environment and send the results one-by-one, similarly to the queue:
@@ -89,7 +89,7 @@ class LIDAR:
         for coor in coordinates:
             x, y = coor[0], coor[1] # get the coordinates x and y
             if grid[x, y] == 1: # if obstacle is detected
-                distance: float = np.sqrt((current_location[0] - x)**2 + (current_location[1] - y)**2)
+                distance: float = get_distance(current_node=current_location, next_node=(x, y))
                 angle:    float = get_vector_angle(current_node=current_location, next_node=(x, y))
                 record = (angle, distance) # compress the data into tuple
                 self.measurement_results.put(record)
