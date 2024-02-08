@@ -53,7 +53,7 @@ def main_simulation():
     env_map.show_path() # show path taken
 
 
-def main():
+def main(show_histogram=None):
     from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
     print("Testing real lidar")
     lidar = LIDAR()
@@ -87,7 +87,9 @@ def main():
             print("\n")
 
             # Update current position
-            lidar.update_position(x=imuMsg.quaternion[0], y=imuMsg.quaternion[1], z=imuMsg.quaternion[2])
+            lidar.update_position(x=round(imuMsg.quaternion[0], 2),
+                                  y=round(imuMsg.quaternion[1], 2),
+                                  z=round(imuMsg.quaternion[2], 2))
 
         elif msgType == 102:  # Scan Message
             length = struct.unpack("=I", data[4:8])[0]
@@ -106,7 +108,7 @@ def main():
             print("\tstamp =", scanMsg.stamp, "id =", scanMsg.id)
             print("\tScan size =", scanMsg.validPointsNum)
             print("\tfirst 10 points (x, y, z, intensity, time, ring) =")
-            for i in range(min(10, scanMsg.validPointsNum)):
+            for i in range(min(30, scanMsg.validPointsNum)):
                 point = scanMsg.points[i]
                 print("\t", point.x, point.y, point.z, point.intensity, point.time, point.ring)
             print("\n")
@@ -115,8 +117,10 @@ def main():
             vfh.update_measurements(lidar.get_values())
             vfh.generate_vfh()
             iteration += 1
-            # vfh.show_histogram()
+            if show_histogram is not None: vfh.show_histogram()
             print("ITERATION: ", iteration)
+            print("Cloud points num: ", validPointsNum)
+            print("Stored angle and distance values: ", len(lidar.values))
             print("HISTOGRAM: ", vfh.histogram)
             print("BEST ANGLE: ", vfh.get_rotation_angle(current_node=(lidar.x, lidar.y), next_node=(lidar.x+1, lidar.y)))
     sock.close()
@@ -125,4 +129,4 @@ def main():
 if __name__ == '__main__':
     if sys.version_info[0:2] != (3, 6):
         raise Exception('Requires python 3.6')
-    main()
+    main(True)

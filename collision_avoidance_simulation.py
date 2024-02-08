@@ -244,10 +244,11 @@ class VFH:
         The current location is indicated as a cross
         The steering direction is indicated as a blue vector passed in degrees
          """
+        # TODO: optimize
         # get x axis for histogram
         x = np.arange(self.histogram.shape[0]) * config.get('sector_angle')
         # plot histogram
-        self.ax1.bar(x, self.histogram)
+        self.ax1.plot(self.histogram, color='b')
         self.ax1.set_xlabel('Angle (in degrees)')
         self.ax1.set_ylabel('Probability')
         self.ax1.set_title('Vector Field Histogram')
@@ -264,7 +265,7 @@ class VFH:
         # adjusting spacing between subplots
         plt.tight_layout()
         # Update the plot
-        plt.pause(1)  # Add a small delay (e.g., 0.1 seconds)
+        plt.pause(0.1)  # Add a small delay (e.g., 0.1 seconds)
 
     def get_obstacle_map(self, measuring_distance: int):
         """

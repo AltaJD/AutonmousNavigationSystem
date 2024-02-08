@@ -1,14 +1,8 @@
 import socket
 import struct
-import numpy as np
 from typing import List
-from queue import Queue
 import time
 from lidar_simulation import get_distance, get_vector_angle
-
-# IP and Port
-UDP_IP = "127.0.0.1"
-UDP_PORT = 12345
 
 
 # Point Type
@@ -46,10 +40,9 @@ class LIDAR:
     The real LIDAR system is scanning the environment and send the results one-by-one, similarly to the queue:
     FIFO (First-In-First-Out)
     """
-    values: Queue
+    values: List[tuple]
     measuring_radius: float
-    certainty_values: np.array
-    threshold: float
+    threshold: float # TODO: determine appropriate threshold
     x: float
     y: float
     z: float
@@ -61,13 +54,13 @@ class LIDAR:
     pointDataStr = "=fffffI"
     scanDataStr = "=dII" + 120 * "fffffI"
 
-    def __init__(self, max_height=0.1, lidar_x=0, lidar_y=0, lidar_z=0):
+    def __init__(self, max_height_threshold=0.1, lidar_x=0, lidar_y=0, lidar_z=0):
         self.measuring_radius = 0
-        self.threshold = max_height
+        self.threshold = max_height_threshold
         self.x = lidar_x
         self.y = lidar_y
         self.z = lidar_z
-        self.values = Queue()
+        self.values = []
         """ Configure LIDAR for data parsing """
         self.imuDataSize = struct.calcsize(self.imuDataStr)
         self.pointSize = struct.calcsize(self.pointDataStr)
@@ -79,16 +72,18 @@ class LIDAR:
         for VFH generation
         """
         current_position = (self.x, self.y)
-        self.values.empty()
+        self.values = []
+        # self.values.task_done()
         for cloud_point in measurements.points:
             if cloud_point.z >= self.threshold: continue
             # calculate data
-            distance: float = get_distance(current_node=current_position, next_node=(cloud_point.x, cloud_point.y))
-            angle: float = get_vector_angle(current_node=current_position, next_node=(cloud_point.x, cloud_point.y))
+            x = cloud_point.x
+            y = cloud_point.y
+            distance: float = get_distance(current_node=current_position, next_node=(x, y))
+            angle: float = get_vector_angle(current_node=current_position, next_node=(x, y))
             # zip data
             record = (angle, distance)
-            self.values.put(record)
-        self.values.task_done()
+            self.values.append(record)
 
     def update_position(self, x: float, y: float, z: float):
         """ Updates the current coordinates of the LIDAR sensor """
@@ -104,13 +99,12 @@ class LIDAR:
         """
         start_time = time.time()
         assert self.values is not None, "LIDAR has not updated measurements values"
-        data = list(self.values.queue)
         print('=' * 5 + f'LIDAR DATA RECEIVED {time.time() - start_time}' + '=' * 5)
-        data.sort()  # sort by angle in ascending order
-        if len(data) == 0:
+        self.values.sort()  # sort by angle in ascending order
+        if len(self.values) == 0:
             return [(0, 0)]
-        self.values.task_done()
-        return data
+        # self.values.task_done()
+        return self.values
 
     def get_socket(self):
         """ Create UDP socket """
@@ -171,6 +165,8 @@ def run_lidar(lidar: LIDAR):
             print("\n")
             # Save data
             lidar.update_values(scanMsg)
+            print("LIDAR values:")
+            print(lidar.values)
     sock.close()
 
 
