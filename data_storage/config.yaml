@@ -20,3 +20,5 @@ a: 1
 b: 1
 l: 6 # max is 18
 vfh_threshold: 0.05
+vfh_time_delay: 500 # ms
+vfh_height_threshold: 0.1 # cm

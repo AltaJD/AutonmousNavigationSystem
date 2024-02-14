@@ -3,6 +3,7 @@ import struct
 from typing import List
 import time
 from lidar_simulation import get_distance, get_vector_angle
+import config
 
 
 # Point Type
@@ -42,7 +43,7 @@ class LIDAR:
     """
     values: List[tuple]
     measuring_radius: float
-    threshold: float # TODO: determine appropriate threshold
+    z_threshold: float # TODO: determine appropriate threshold
     x: float
     y: float
     z: float
@@ -54,9 +55,9 @@ class LIDAR:
     pointDataStr = "=fffffI"
     scanDataStr = "=dII" + 120 * "fffffI"
 
-    def __init__(self, max_height_threshold=0.1, lidar_x=0, lidar_y=0, lidar_z=0):
+    def __init__(self, max_height_threshold=config.get('vfh_height_threshold'), lidar_x=0, lidar_y=0, lidar_z=0):
         self.measuring_radius = 0
-        self.threshold = max_height_threshold
+        self.z_threshold = max_height_threshold
         self.x = lidar_x
         self.y = lidar_y
         self.z = lidar_z
@@ -66,24 +67,27 @@ class LIDAR:
         self.pointSize = struct.calcsize(self.pointDataStr)
         self.scanDataSize = struct.calcsize(self.scanDataStr)
 
-    def update_values(self, measurements: ScanUnitree) -> None:
+    def append_values(self, measurements: ScanUnitree) -> None:
         """
         Convert the (x,y,z,w) values to the appropriate values
         for VFH generation
         """
         current_position = (self.x, self.y)
-        self.values = []
         # self.values.task_done()
         for cloud_point in measurements.points:
-            if cloud_point.z >= self.threshold: continue
+            if cloud_point.z > self.z_threshold:
+                continue # FIXME
             # calculate data
             x = cloud_point.x
             y = cloud_point.y
             distance: float = get_distance(current_node=current_position, next_node=(x, y))
-            angle: float = get_vector_angle(current_node=current_position, next_node=(x, y))
+            angle:    float = get_vector_angle(current_node=current_position, next_node=(x, y))
             # zip data
             record = (angle, distance)
             self.values.append(record)
+
+    def empty_values(self):
+        self.values.clear()
 
     def update_position(self, x: float, y: float, z: float):
         """ Updates the current coordinates of the LIDAR sensor """
@@ -99,7 +103,6 @@ class LIDAR:
         """
         start_time = time.time()
         assert self.values is not None, "LIDAR has not updated measurements values"
-        print('=' * 5 + f'LIDAR DATA RECEIVED {time.time() - start_time}' + '=' * 5)
         self.values.sort()  # sort by angle in ascending order
         if len(self.values) == 0:
             return [(0, 0)]
@@ -113,7 +116,7 @@ class LIDAR:
         return sock
 
 
-def run_lidar(lidar: LIDAR):
+def run_lidar_test(lidar: LIDAR):
     """ Testing Lidar communication """
     sock = lidar.get_socket()
     print("pointSize = " + str(lidar.pointSize) +
@@ -164,7 +167,7 @@ def run_lidar(lidar: LIDAR):
                 print("\t", point.x, point.y, point.z, point.intensity, point.time, point.ring)
             print("\n")
             # Save data
-            lidar.update_values(scanMsg)
+            lidar.append_values(scanMsg)
             print("LIDAR values:")
             print(lidar.values)
     sock.close()
@@ -172,7 +175,7 @@ def run_lidar(lidar: LIDAR):
 
 if __name__ == '__main__':
     lidar_sensor = LIDAR()
-    run_lidar(lidar_sensor)
+    run_lidar_test(lidar_sensor)
     values = lidar_sensor.get_values()
     print("LIDAR values:")
     print(values)

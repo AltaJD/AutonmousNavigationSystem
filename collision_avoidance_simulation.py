@@ -1,9 +1,7 @@
-import threading
-
 from map import Map
 import numpy as np
 from lidar_simulation import get_vector_angle
-from typing import List
+from typing import List, Tuple
 from math import cos, sin
 import matplotlib.pyplot as plt
 import config
@@ -13,6 +11,7 @@ class VFH:
     desired_direction: float    # represents the angle from current node to target node
     steering_direction: float
     measurements: List[tuple]
+    free_sectors_num: List[Tuple[int, float]]  # store the number of obstacle-free sectors to evaluate performance of LIDAR
     histogram: np.array         # histogram represented as np.array with a shape (n, 0)
     threshold: float            # in % specifies the minimum obstacle probability acceptable as obstacle-free path
     steering_direction: int
@@ -24,18 +23,18 @@ class VFH:
     def __init__(self, threshold: float,
                  a, b, alpha, l_param):
         """
-        :param threshold:
-        :param lidar_measurements:
-        :param a:
-        :param b:
-        :param alpha:
-        :param l_param:
+        :param threshold: provides max probability for obstacle-free sector
+        :param a: constant for determining obstacle probability
+        :param b: constant for determining obstacle probability
+        :param alpha: width of the sector in degrees
+        :param l_param: constant for smoothing histogram
         """
         self.threshold = threshold
         self.alpha = alpha
         self.a = a
         self.b = b
         self.l = l_param
+        self.free_sectors_num = [(0, 0)] # (num_of_sectors, time_in_ms)
         # set up figure instance
         fig, (ax1, ax2) = plt.subplots(2, 1)
         self.fig = fig
@@ -44,6 +43,14 @@ class VFH:
 
     def update_measurements(self, values: List[tuple]):
         self.measurements = values
+
+    def update_free_sectors(self, num: int, time: float):
+        last_time = self.free_sectors_num[-1][1] # get time
+        time += last_time
+        self.free_sectors_num.append((num, time))
+
+    def get_free_sectors_num(self) -> int:
+        return np.count_nonzero(self.histogram == 0)
 
     def get_rotation_angle(self, current_node: tuple, next_node: tuple) -> int:
         """ Get the angle with the lowest probability of the obstacles ahead
@@ -86,7 +93,7 @@ class VFH:
         self.steering_direction = best_angle
         return best_angle
 
-    def generate_vfh(self) -> None:
+    def generate_vfh(self) -> List[tuple]:
         """ The function will generate the Vector Field Histogram
         The magnitude of the obstacle is represented as a formula:
         m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
@@ -100,18 +107,19 @@ class VFH:
         :returns np.array with shape: (n, 0)
         """
         c: np.array = self.get_certainty_values()
-        magnitudes = self.get_magnitudes(c, self.b)
+        magnitudes: np.array = self.get_magnitudes(c, self.b)
         self.histogram = self.get_sectors(magnitudes, self.alpha)
         # histogram is updated inplace
         self.smooth_histogram(l=self.l)
         self.normalize_histogram()
+        return self.measurements
 
     def get_certainty_values(self) -> np.array:
         """
         The function determine the location of the obstacles and create virtual AxA map of their locations,
         where A is a measuring distance as an int
         The measurements include the coordinates (angle, distance) of the obstacles detected by the virtual LIDAR
-        :returns the list with 1+distance: int and 0, where 1+distance is a certainty value of obstacle
+        :returns the list with 1+distance: double and 0, where 1+distance is a certainty value of obstacle
         otherwise, the [0] is returned
         """
         obstacle_magnitudes = []
@@ -121,7 +129,7 @@ class VFH:
             angle, distance = value
             # assign 1+distance for obstacle and 0 as freeway
             # the certainty value based on the distance is assigned to the obstacle map
-            obstacle_magnitudes.append(1 + round(distance))
+            obstacle_magnitudes.append(1 + distance)
         if len(obstacle_magnitudes) > 0:
             return np.array(obstacle_magnitudes)
         return np.zeros(1, dtype=np.float)
@@ -154,6 +162,9 @@ class VFH:
         initial_sector = int(initial_angle / alpha)  # starting sector
         normalized_histogram = self.expand_histogram(angles=h_k, max_size=sectors_num, starting_index=initial_sector)
         return np.array(normalized_histogram)
+
+    def empty_histogram(self):
+        np.empty_like(self.histogram)
 
     def smooth_histogram(self, l: int) -> None:
         """ Initial mapping may appear ragged and cause errors in the selection of the steering direction
@@ -247,12 +258,14 @@ class VFH:
         # TODO: optimize
         # get x axis for histogram
         x = np.arange(self.histogram.shape[0]) * config.get('sector_angle')
+        self.ax1.clear()
         # plot histogram
         self.ax1.plot(self.histogram, color='b')
         self.ax1.set_xlabel('Angle (in degrees)')
         self.ax1.set_ylabel('Probability')
         self.ax1.set_title('Vector Field Histogram')
-        if env is not None and current_node is not None: self.show_map(self.ax2, env, current_node)
+        if env is not None and current_node is not None: self.show_map(env, current_node)
+        else: self.show_free_sectors_num()
         if target_node is not None:
             plt.plot(target_node[1], target_node[0], 'gx')
             # show 0 angle vector
@@ -294,17 +307,25 @@ class VFH:
         plt.imshow(self.get_obstacle_map(measuring_distance), cmap='Greys', origin='lower', alpha=0.7)
         plt.show()
 
-    @staticmethod
-    def show_map(ax2, env: Map, current_node: tuple) -> None:
+    def show_map(self, env: Map, current_node: tuple) -> None:
         # plot grid
-        ax2.imshow(env.grid, origin='lower')
-        ax2.imshow(env.skeleton, cmap='Greys', origin='lower', alpha=0.7)
-        ax2.set_xlabel('North')
-        ax2.set_ylabel('East')
-        ax2.set_title('Environment map')
+        self.ax2.imshow(env.grid, origin='lower')
+        self.ax2.imshow(env.skeleton, cmap='Greys', origin='lower', alpha=0.7)
+        self.ax2.set_xlabel('North')
+        self.ax2.set_ylabel('East')
+        self.ax2.set_title('Environment map')
         # show the current location
-        ax2.plot(current_node[1], current_node[0], 'rx')
-        ax2.figure.set_size_inches(10, 10)
+        self.ax2.plot(current_node[1], current_node[0], 'rx')
+        self.ax2.figure.set_size_inches(10, 10)
+
+    def show_free_sectors_num(self):
+        # Extract the x and y values from the input data
+        time_in_ms = [entry[1] for entry in self.free_sectors_num]
+        sectors_num = [entry[0] for entry in self.free_sectors_num]
+        self.ax2.plot(time_in_ms, sectors_num)
+        self.ax2.set_title('VFH update rate')
+        self.ax2.set_xlabel('Time (ms)')
+        self.ax2.set_ylabel('Number of Free Sectors')
 
 
 def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goal: tuple) -> None:

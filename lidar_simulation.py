@@ -56,7 +56,6 @@ class LidarSimulation:
         data = []
         while not self.measurement_results.empty():
             data.append(self.measurement_results.get())
-        print('='*5+f'LIDAR DATA RECEIVED {time.time()-start_time}'+'='*5)
         data.sort() # sort by angle in ascending order
         if len(data) == 0:
             return [(0, 0)]

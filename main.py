@@ -5,13 +5,13 @@ import config as config
 import sys
 import numpy as np
 import struct
+import time
+from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
 
 
 def main_simulation():
     from lidar_simulation import LidarSimulation
     """ === Get configuration === """
-    # start_default:      tuple = config.get('initial_position')
-    # goal_default:       tuple = config.get('final_position')
     safety_distance:    float   = config.get('safety_distance')
     filename:           str     = config.get('colliders')
     lidar_radius:       int     = config.get('lidar_radius')
@@ -53,8 +53,19 @@ def main_simulation():
     env_map.show_path() # show path taken
 
 
+def show_scan_message(message: ScanUnitree, points_num: int) -> None:
+    """ Print raw data received from the LIDAR """
+    print("A Scan msg is parsed!")
+    print("\tstamp =", message.stamp, "id =", message.id)
+    print("\tScan size =", message.validPointsNum)
+    print("\tfirst 10 points (x, y, z, intensity, time, ring) =")
+    for i in range(min(points_num, message.validPointsNum)):
+        point = message.points[i]
+        print("\t", point.x, point.y, point.z, point.intensity, point.time, point.ring)
+    print("\n")
+
+
 def main(show_histogram=None):
-    from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
     print("Testing real lidar")
     lidar = LIDAR()
     vfh = VFH(a=config.get('a'),
@@ -67,6 +78,7 @@ def main(show_histogram=None):
           ", scanDataSize = " + str(lidar.scanDataSize) +
           ", imuDataSize = " + str(lidar.imuDataSize))
     iteration = 0
+    start_time = time.time()
     while True:
         # Recv data
         data, addr = sock.recvfrom(10000)
@@ -87,11 +99,12 @@ def main(show_histogram=None):
             print("\n")
 
             # Update current position
-            lidar.update_position(x=round(imuMsg.quaternion[0], 2),
-                                  y=round(imuMsg.quaternion[1], 2),
-                                  z=round(imuMsg.quaternion[2], 2))
+            lidar.update_position(x=round(imuMsg.quaternion[0], 3),
+                                  y=round(imuMsg.quaternion[1], 3),
+                                  z=round(imuMsg.quaternion[2], 3))
 
         elif msgType == 102:  # Scan Message
+            """ Preprocess received data """
             length = struct.unpack("=I", data[4:8])[0]
             stamp = struct.unpack("=d", data[8:16])[0]
             id = struct.unpack("=I", data[16:20])[0]
@@ -104,29 +117,31 @@ def main(show_histogram=None):
                 point = PointUnitree(*pointData)
                 scanPoints.append(point)
             scanMsg = ScanUnitree(stamp, id, validPointsNum, scanPoints)
-            print("A Scan msg is parsed!")
-            print("\tstamp =", scanMsg.stamp, "id =", scanMsg.id)
-            print("\tScan size =", scanMsg.validPointsNum)
-            print("\tfirst 10 points (x, y, z, intensity, time, ring) =")
-            for i in range(min(30, scanMsg.validPointsNum)):
-                point = scanMsg.points[i]
-                print("\t", point.x, point.y, point.z, point.intensity, point.time, point.ring)
-            print("\n")
-            # Save data
-            lidar.update_values(scanMsg)
+            show_scan_message(scanMsg, 10)
+            """ Collect data """
+            time_diff = round(time.time()-start_time, 4)*1000 # in milliseconds
+            lidar.append_values(scanMsg)
             vfh.update_measurements(lidar.get_values())
+            if time_diff < config.get('vfh_time_delay'):
+                continue # set a delay for collecting enough points
             vfh.generate_vfh()
             iteration += 1
-            if show_histogram is not None: vfh.show_histogram()
             print("ITERATION: ", iteration)
             print("Cloud points num: ", validPointsNum)
             print("Stored angle and distance values: ", len(lidar.values))
             print("HISTOGRAM: ", vfh.histogram)
             print("BEST ANGLE: ", vfh.get_rotation_angle(current_node=(lidar.x, lidar.y), next_node=(lidar.x+1, lidar.y)))
+            processing_time = round(time.time()-start_time, 4)*1000 # processing time in ms
+            print("="*10+f"Received {validPointsNum} LIDAR points  in {processing_time} ms"+10*"=")
+            vfh.update_free_sectors(num=vfh.get_free_sectors_num(), time=processing_time)
+            if show_histogram is True: vfh.show_histogram()
+            lidar.empty_values()
+            vfh.empty_histogram()
+            start_time = time.time()
     sock.close()
 
 
 if __name__ == '__main__':
     if sys.version_info[0:2] != (3, 6):
         raise Exception('Requires python 3.6')
-    main(True)
+    main(show_histogram=True)
