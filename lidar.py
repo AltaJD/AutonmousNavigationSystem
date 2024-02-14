@@ -1,9 +1,9 @@
 import socket
 import struct
 from typing import List
-import time
-from lidar_simulation import get_distance, get_vector_angle
+from lidar_simulation import get_distance, get_vector_angle, convert_to_degrees
 import config
+from math import degrees
 
 
 # Point Type
@@ -43,10 +43,12 @@ class LIDAR:
     """
     values: List[tuple]
     measuring_radius: float
-    z_threshold: float # TODO: determine appropriate threshold
+    z_threshold: float
     x: float
     y: float
     z: float
+    start_blind_spot: int
+    end_blind_spot: int
 
     """ Values to extract and communicate with the LIDAR """
     UDP_IP = "127.0.0.1"
@@ -58,6 +60,8 @@ class LIDAR:
     def __init__(self, max_height_threshold=config.get('vfh_height_threshold'), lidar_x=0, lidar_y=0, lidar_z=0):
         self.measuring_radius = 0
         self.z_threshold = max_height_threshold
+        self.start_blind_spot = config.get('blind_spot_range')[0]
+        self.end_blind_spot   = config.get('blind_spot_range')[1]
         self.x = lidar_x
         self.y = lidar_y
         self.z = lidar_z
@@ -73,15 +77,19 @@ class LIDAR:
         for VFH generation
         """
         current_position = (self.x, self.y)
-        # self.values.task_done()
         for cloud_point in measurements.points:
+            # neglect third dimension
             if cloud_point.z > self.z_threshold:
-                continue # FIXME
+                continue
             # calculate data
             x = cloud_point.x
             y = cloud_point.y
-            distance: float = get_distance(current_node=current_position, next_node=(x, y))
-            angle:    float = get_vector_angle(current_node=current_position, next_node=(x, y))
+            distance:   float = get_distance(current_node=current_position, next_node=(x, y))
+            angle:      float = get_vector_angle(current_node=current_position, next_node=(x, y))
+            # neglect blind spots
+            if self.start_blind_spot < convert_to_degrees(angle) < self.end_blind_spot:
+                print(f"ANGLE {convert_to_degrees(angle)} Has been skipped") # TODO: remove
+                continue
             # zip data
             record = (angle, distance)
             self.values.append(record)
@@ -101,7 +109,6 @@ class LIDAR:
         The values are appended to the list for storage and easier data validation.
         :returns [(angle1, distance1), (angle2, distance2)]
         """
-        start_time = time.time()
         assert self.values is not None, "LIDAR has not updated measurements values"
         self.values.sort()  # sort by angle in ascending order
         if len(self.values) == 0:

@@ -12,10 +12,10 @@ from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
 def main_simulation():
     from lidar_simulation import LidarSimulation
     """ === Get configuration === """
-    safety_distance:    float   = config.get('safety_distance')
-    filename:           str     = config.get('colliders')
-    lidar_radius:       int     = config.get('lidar_radius')
-    map_figure_size:    int     = config.get('map_figure_size')
+    safety_distance: float = config.get('safety_distance')
+    filename: str = config.get('colliders')
+    lidar_radius: int = config.get('lidar_radius')
+    map_figure_size: int = config.get('map_figure_size')
 
     # prepare Map
     env_map = Map(filename, map_figure_size, safety_distance)
@@ -28,11 +28,10 @@ def main_simulation():
     lidar_simulation = LidarSimulation(lidar_radius)
 
     # prepare VFH
-    vfh = VFH(a=config.get('a'),
-              b=config.get('b'),
+    vfh = VFH(b=config.get('b'),
               alpha=config.get('sector_angle'),
               l_param=config.get('l'),
-              threshold=config.get('vfh_threshold'))
+              safety_distance=config.get('safety_distance'))
     vfh.update_measurements(lidar_simulation.get_values())
 
     # create Wheelchair
@@ -49,8 +48,8 @@ def main_simulation():
         path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
 
     """ Visualizing path taken by the simulation """
-    env_map.path.waypoints = np.array(path_taken) # change the generated path to path taken
-    env_map.show_path() # show path taken
+    env_map.path.waypoints = np.array(path_taken)  # change the generated path to path taken
+    env_map.show_path()  # show path taken
 
 
 def show_scan_message(message: ScanUnitree, points_num: int) -> None:
@@ -68,11 +67,10 @@ def show_scan_message(message: ScanUnitree, points_num: int) -> None:
 def main(show_histogram=None):
     print("Testing real lidar")
     lidar = LIDAR()
-    vfh = VFH(a=config.get('a'),
-              b=config.get('b'),
+    vfh = VFH(b=config.get('b'),
               alpha=config.get('sector_angle'),
               l_param=config.get('l'),
-              threshold=config.get('vfh_threshold'))
+              safety_distance=config.get('safety_distance'))
     sock = lidar.get_socket()
     print("pointSize = " + str(lidar.pointSize) +
           ", scanDataSize = " + str(lidar.scanDataSize) +
@@ -117,24 +115,28 @@ def main(show_histogram=None):
                 point = PointUnitree(*pointData)
                 scanPoints.append(point)
             scanMsg = ScanUnitree(stamp, id, validPointsNum, scanPoints)
-            show_scan_message(scanMsg, 10)
+            # show_scan_message(scanMsg, 10)
             """ Collect data """
-            time_diff = round(time.time()-start_time, 4)*1000 # in milliseconds
+            time_diff = round(time.time() - start_time, 4) * 1000  # in milliseconds
             lidar.append_values(scanMsg)
             vfh.update_measurements(lidar.get_values())
             if time_diff < config.get('vfh_time_delay'):
-                continue # set a delay for collecting enough points
+                continue  # set a delay for collecting enough points
             vfh.generate_vfh()
             iteration += 1
             print("ITERATION: ", iteration)
             print("Cloud points num: ", validPointsNum)
             print("Stored angle and distance values: ", len(lidar.values))
-            print("HISTOGRAM: ", vfh.histogram)
-            print("BEST ANGLE: ", vfh.get_rotation_angle(current_node=(lidar.x, lidar.y), next_node=(lidar.x+1, lidar.y)))
-            processing_time = round(time.time()-start_time, 4)*1000 # processing time in ms
-            print("="*10+f"Received {validPointsNum} LIDAR points  in {processing_time} ms"+10*"=")
+            print("BEST ANGLE: ",
+                  vfh.get_rotation_angle(current_node=(lidar.x, lidar.y), next_node=(lidar.x + 1, lidar.y)))
+            # print("HISTOGRAM: ", vfh.histogram)
+            # print("ANGLES AND DISTANCES: ", lidar.values)
+            print(f"BLIND SPOT: from {lidar.start_blind_spot} to {lidar.end_blind_spot} degrees")
+            processing_time = round(time.time() - start_time, 4) * 1000  # processing time in ms
+            print("=" * 10 + f"Received {validPointsNum} LIDAR points  in {processing_time} ms" + 10 * "=")
             vfh.update_free_sectors(num=vfh.get_free_sectors_num(), time=processing_time)
-            if show_histogram is True: vfh.show_histogram()
+            if show_histogram is True:
+                vfh.show_histogram()
             lidar.empty_values()
             vfh.empty_histogram()
             start_time = time.time()

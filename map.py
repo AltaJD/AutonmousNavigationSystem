@@ -380,5 +380,7 @@ if __name__ == '__main__':
     filename: str = config.get('colliders')
 
     map = Map(filename, 18, safety_distance)
-    map.create_path()
+    start = map.select_start()
+    end = map.select_end()
+    map.create_path(start, end)
     map.show_path()

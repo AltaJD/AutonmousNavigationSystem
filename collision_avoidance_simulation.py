@@ -1,6 +1,6 @@
 from map import Map
 import numpy as np
-from lidar_simulation import get_vector_angle
+from lidar_simulation import get_vector_angle, convert_to_degrees
 from typing import List, Tuple
 from math import cos, sin
 import matplotlib.pyplot as plt
@@ -8,33 +8,36 @@ import config
 
 
 class VFH:
-    desired_direction: float    # represents the angle from current node to target node
+    desired_direction: float  # represents the angle from current node to target node
     steering_direction: float
     measurements: List[tuple]
-    free_sectors_num: List[Tuple[int, float]]  # store the number of obstacle-free sectors to evaluate performance of LIDAR
-    histogram: np.array         # histogram represented as np.array with a shape (n, 0)
-    threshold: float            # in % specifies the minimum obstacle probability acceptable as obstacle-free path
+    free_sectors_num: List[Tuple[int, float]]  # number of obstacle-free sectors to evaluate performance of LIDAR
+    histogram: np.array  # histogram represented as np.array with a shape (n, 0)
+    threshold: float  # in % specifies the minimum obstacle probability acceptable as obstacle-free path
+    safety_distance: float
     steering_direction: int
-    a: int
-    b: int
+    a: float
+    b: float
     alpha: int
     l: int
 
-    def __init__(self, threshold: float,
-                 a, b, alpha, l_param):
+    def __init__(self, safety_distance: float, b, alpha, l_param, a=None):
         """
-        :param threshold: provides max probability for obstacle-free sector
+        Sets the parameters for the VFH generation
+        :param safety_distance: min distance to the obstacle in m (0.1 = 10 cm)
         :param a: constant for determining obstacle probability
         :param b: constant for determining obstacle probability
         :param alpha: width of the sector in degrees
         :param l_param: constant for smoothing histogram
         """
-        self.threshold = threshold
+        self.safety_distance = safety_distance
         self.alpha = alpha
         self.a = a
         self.b = b
         self.l = l_param
-        self.free_sectors_num = [(0, 0)] # (num_of_sectors, time_in_ms)
+        self.safety_distance = 0
+        self.free_sectors_num = [(0, 0.0)]  # (num_of_sectors, time_in_ms)
+        self.histogram = np.zeros(int(360 / self.alpha)) # by default it contains only zeros
         # set up figure instance
         fig, (ax1, ax2) = plt.subplots(2, 1)
         self.fig = fig
@@ -45,7 +48,7 @@ class VFH:
         self.measurements = values
 
     def update_free_sectors(self, num: int, time: float):
-        last_time = self.free_sectors_num[-1][1] # get time
+        last_time = self.free_sectors_num[-1][1]  # get time
         time += last_time
         self.free_sectors_num.append((num, time))
 
@@ -58,7 +61,8 @@ class VFH:
         :param current_node is the (x, y) of current location of the LIDAR/Wheelchair
         :return angle in degrees
         """
-        self.generate_vfh()
+        if self.histogram is None:
+            self.generate_vfh()
         # determining angle that is the closest to the target point
         obstacle_free_sectors: List[int] = np.where(self.histogram <= self.threshold)[0]
         assert len(obstacle_free_sectors) > 0
@@ -67,7 +71,7 @@ class VFH:
         wide_sector = []
         for i in range(len(obstacle_free_sectors) - 1):
             current_value = obstacle_free_sectors[i]
-            next_value = obstacle_free_sectors[i+1]
+            next_value = obstacle_free_sectors[i + 1]
             difference = next_value - current_value
             if difference == 1:
                 wide_sector.append(current_value)
@@ -84,84 +88,53 @@ class VFH:
         # select the angle closest to the desired angle
         if desired_angle < 0:
             desired_angle += 360
-        desired_angle = np.floor(desired_angle/config.get('sector_angle'))
+        desired_angle = np.floor(desired_angle / config.get('sector_angle'))
         self.desired_direction = desired_angle
-        minimums_diff = list(map(lambda x: abs(x-desired_angle), obstacle_free_sectors))
+        minimums_diff = list(map(lambda x: abs(x - desired_angle), obstacle_free_sectors))
         best_angle = obstacle_free_sectors[minimums_diff.index(min(minimums_diff))]
         # convert angle to degrees
         best_angle *= config.get('sector_angle')
         self.steering_direction = best_angle
         return best_angle
 
-    def generate_vfh(self) -> List[tuple]:
+    def generate_vfh(self) -> None:
         """ The function will generate the Vector Field Histogram
         The magnitude of the obstacle is represented as a formula:
         m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
         where:
         1. c[i][j] = certainty value
         2. d[i][j] = distances to each obstacle
-        3. a and b are positive constants, where a = b*max(distance)
+        3. a and b are positive constants, where a = b*max(distance) if a is not provided
         4. m[i][j] will be a one dimensional array consisting of values greater than 0
 
         alpha is an angle division that should be in degrees
         :returns np.array with shape: (n, 0)
         """
-        c: np.array = self.get_certainty_values()
-        magnitudes: np.array = self.get_magnitudes(c, self.b)
-        self.histogram = self.get_sectors(magnitudes, self.alpha)
-        # histogram is updated inplace
+        self.histogram * 0  # reset histogram
+        highest_distance = max(self.measurements, key=lambda x: x[1])[1]
+        if self.a is None:
+            self.a = self.b * highest_distance
+        for i in range(len(self.measurements)):
+            angle: float = self.measurements[i][0]  # radians
+            angle = convert_to_degrees(angle)  # degrees
+            distance: float = self.measurements[i][1]  # meters
+
+            c: float = distance + 1  # certainty value
+            m: float = (c**2) * (self.a - self.b * distance)  # magnitude # FIXME
+            if m < 0:
+                m = 0
+            # print("HIGHEST: ", highest_distance, distance)
+            # print("Magnitude: ", self.a - self.b * distance)
+            assert m >= 0, "Magnitude is a negative number"
+
+            sector: int = round(np.floor(angle/self.alpha))
+            self.histogram[sector] += m
+        # update histogram in place
         self.smooth_histogram(l=self.l)
         self.normalize_histogram()
-        return self.measurements
 
-    def get_certainty_values(self) -> np.array:
-        """
-        The function determine the location of the obstacles and create virtual AxA map of their locations,
-        where A is a measuring distance as an int
-        The measurements include the coordinates (angle, distance) of the obstacles detected by the virtual LIDAR
-        :returns the list with 1+distance: double and 0, where 1+distance is a certainty value of obstacle
-        otherwise, the [0] is returned
-        """
-        obstacle_magnitudes = []
-        for value in self.measurements:
-            # angle in radians
-            # distance in meters
-            angle, distance = value
-            # assign 1+distance for obstacle and 0 as freeway
-            # the certainty value based on the distance is assigned to the obstacle map
-            obstacle_magnitudes.append(1 + distance)
-        if len(obstacle_magnitudes) > 0:
-            return np.array(obstacle_magnitudes)
-        return np.zeros(1, dtype=np.float)
-
-    def get_sectors(self, magnitudes: np.array, alpha: float) -> np.array:
-        """ The function creates the grid as np.array of the angles to the obstacle
-        The measurements include the coordinates (angle, distance) of the obstacles detected by the virtual LIDAR
-        :returns: polar obstacle density as np.array, dtype=int
-        """
-        # determine polar obstacle density h_k, where k is each sector divided by alpha
-        h_k = []  # List[int]
-        m_sum = 0  # sum of magnitudes per sector
-        # set initial/starting angle
-        starting_angle: float = self.measurements[0][0] * 180 / np.pi  # in degrees
-        for i in range(len(self.measurements)):
-            beta: float = self.measurements[i][0]  # get angle in radiance
-            beta = beta * 180 / np.pi  # convert radiance to degrees
-            # determine sum of the magnitudes for particular sector
-            if beta - starting_angle <= alpha:
-                m_sum += magnitudes[i]  # if the magnitude is in the sector, we add it to the sum
-            else:
-                h_k.append(round(m_sum, 0))  # store the sector cumulative magnitude
-                m_sum = 0  # reset sum
-                starting_angle = beta  # set the new starting angle for the sector in degrees
-        # expand the angle ranges from 0 to 360 degrees
-        initial_angle: float = self.measurements[0][0] * 180 / np.pi  # degrees
-        if initial_angle < 0:
-            initial_angle += 360  # convert to the positive sign angle
-        sectors_num = int(360 / alpha)  # number of sectors
-        initial_sector = int(initial_angle / alpha)  # starting sector
-        normalized_histogram = self.expand_histogram(angles=h_k, max_size=sectors_num, starting_index=initial_sector)
-        return np.array(normalized_histogram)
+    def get_histogram(self) -> np.array:
+        return self.histogram
 
     def empty_histogram(self):
         np.empty_like(self.histogram)
@@ -188,99 +161,16 @@ class VFH:
 
     def normalize_histogram(self) -> None:
         highest_magnitude = max(self.histogram)
-        self.histogram = np.array(
-            [magnitude / highest_magnitude if highest_magnitude != 0 else 0 for magnitude in self.histogram])
+        # update threshold %
+        self.threshold = self.get_threshold_magnitude(min_distance=self.safety_distance) / highest_magnitude
+        self.histogram = np.array([magnitude / highest_magnitude if highest_magnitude != 0 else 0 for magnitude in self.histogram])
 
-    @staticmethod
-    def get_magnitudes(certainty_values: np.array, b: int, a=None) -> np.array:
-        """ The magnitudes are calculated using: m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
-        The distances are included in the certainty values as (d[i][j] = c[i][j]-1)
-        """
-        # since the distance is included in the certainty values, it can be extracted as follows:
-        d: np.array = certainty_values.copy()  # distances
-        for i in range(d.shape[0]):
-            cell_value = d[i]
-            if cell_value > 0:
-                d[i] = cell_value - 1
-        if a is None:
-            a = b * max(d)
-        return (certainty_values ** 2) * (a - b * d)  # m[i][j]
+    def get_threshold_magnitude(self, min_distance: float) -> float:
+        if self.a is None:
+            self.a = self.b * min_distance
+        return ((min_distance+1)**2)*(self.a - self.b * min_distance)
 
-    @staticmethod
-    def expand_histogram(angles: List[int], max_size: int, starting_index: int) -> List[int]:
-        """ Considering that the histogram may have a size of 5 or 5*alpha degrees range
-        It should be expanded to 360 degrees to be considered for VFH algorithm
-        The function inserts the angles list to the resulting list from starting index
-        :returns the list of size max_size (36) and including the angles list from the starting index
-        """
-
-        def shift_to_right(values: List[int], size: int) -> List[int]:
-            """ If indexes > size => shift to the beginning of the list
-            Example: [0, 0, value3]
-            size = 2 => [value3, 0]
-            """
-            for i in range(size, len(values)):
-                values[i - size] = values[i]
-            return values
-
-        def fill_to_right(values: List[int], size: int) -> List[int]:
-            """ If indexes < size => expand the list up to max size
-            Example: [value1, value2]; size = 3 => [value1, value2, 0]
-            """
-            values = values + [0] * (size - len(values))
-            return values
-
-        if len(angles) == max_size:
-            # if no insertion is required:
-            return angles
-        # insertion process
-        """ Shift the indexes by starting index 
-        Example:
-        starting_index = 1 => [0, value1, value2, ...]
-        starting_index = 2 => [0, 0, value1, value2, ...]
-        """
-        expanded_list = list(np.zeros(max_size))[:starting_index] + angles
-        if len(expanded_list) < max_size:
-            expanded_list = fill_to_right(expanded_list, max_size)
-        else:
-            expanded_list = shift_to_right(expanded_list, max_size)
-        expanded_list = expanded_list[:max_size]
-        assert len(expanded_list) == max_size
-        return expanded_list
-
-    def show_histogram(self, current_node=None, target_node=None, env=None) -> None:
-        """
-        The function is using plt to plot the histogram and
-        the map of the environment as subplots
-        The current location is indicated as a cross
-        The steering direction is indicated as a blue vector passed in degrees
-         """
-        # TODO: optimize
-        # get x axis for histogram
-        x = np.arange(self.histogram.shape[0]) * config.get('sector_angle')
-        self.ax1.clear()
-        # plot histogram
-        self.ax1.plot(self.histogram, color='b')
-        self.ax1.set_xlabel('Angle (in degrees)')
-        self.ax1.set_ylabel('Probability')
-        self.ax1.set_title('Vector Field Histogram')
-        if env is not None and current_node is not None: self.show_map(env, current_node)
-        else: self.show_free_sectors_num()
-        if target_node is not None:
-            plt.plot(target_node[1], target_node[0], 'gx')
-            # show 0 angle vector
-            plt.quiver(current_node[1], current_node[0], sin(0) * 1, cos(0) * 1, color='r')
-            # show the steering direction
-            plt.quiver(current_node[1], current_node[0],
-                       sin(np.radians(self.steering_direction)),
-                       cos(np.radians(self.steering_direction)),
-                       color='b')
-        # adjusting spacing between subplots
-        plt.tight_layout()
-        # Update the plot
-        plt.pause(0.1)  # Add a small delay (e.g., 0.1 seconds)
-
-    def get_obstacle_map(self, measuring_distance: int):
+    def get_obstacle_map(self, measuring_distance: int) -> np.array:
         """
         The function determine the location of the obstacles and create virtual AxA map of their locations,
         where A is a measuring distance as an int
@@ -302,6 +192,39 @@ class VFH:
             # the certainty value based on the distance is assigned to the obstacle map
             obstacle_grid[location_y][location_x] = 1 + round(distance)
         return obstacle_grid
+
+    def show_histogram(self, current_node=None, target_node=None, env=None) -> None:
+        """
+        The function is using plt to plot the histogram and
+        the map of the environment as subplots
+        The current location is indicated as a cross
+        The steering direction is indicated as a blue vector passed in degrees
+         """
+        # get x axis for histogram
+        x = np.arange(self.histogram.shape[0]) * config.get('sector_angle')
+        self.ax1.clear()
+        # plot histogram
+        self.ax1.plot(self.histogram, color='b')
+        self.ax1.set_xlabel('Angle (in degrees)')
+        self.ax1.set_ylabel('Probability')
+        self.ax1.set_title('Vector Field Histogram')
+        if env is not None and current_node is not None:
+            self.show_map(env, current_node)
+        else:
+            self.show_free_sectors_num()
+        if target_node is not None:
+            plt.plot(target_node[1], target_node[0], 'gx')
+            # show 0 angle vector
+            plt.quiver(current_node[1], current_node[0], sin(0) * 1, cos(0) * 1, color='r')
+            # show the steering direction
+            plt.quiver(current_node[1], current_node[0],
+                       sin(np.radians(self.steering_direction)),
+                       cos(np.radians(self.steering_direction)),
+                       color='b')
+        # adjusting spacing between subplots
+        plt.tight_layout()
+        # Update the plot
+        plt.pause(0.1)  # Add a small delay (e.g., 0.1 seconds)
 
     def show_obstacle_map(self, measuring_distance: int) -> None:
         plt.imshow(self.get_obstacle_map(measuring_distance), cmap='Greys', origin='lower', alpha=0.7)
@@ -334,11 +257,10 @@ def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goa
     map_2d = Map(filename=filename, size=12, safety_distance=safety_distance)
     lidar_simulation = LidarSimulation(radius=config.get('lidar_radius'))
     lidar_simulation.scan(grid=map_2d.grid, current_location=start)
-    vfh = VFH(a=config.get('a'),
-              b=config.get('b'),
+    vfh = VFH(b=config.get('b'),
               alpha=config.get('sector_angle'),
               l_param=config.get('l'),
-              threshold=config.get('vfh_threshold'))
+              safety_distance=config.get('safety_distance'))
     vfh.update_measurements(lidar_simulation.get_values())
     vfh.get_rotation_angle(current_node=start, next_node=goal)
     vfh.show_histogram(current_node=start, env=map_2d)
@@ -346,9 +268,9 @@ def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goa
 
 if __name__ == '__main__':
     """ Retrieve testing data """
-    start_default:      tuple   = config.get('initial_position')
-    file_name:          str     = config.get('colliders')
-    safety_distance:    int     = config.get('safety_distance')
-    goal_default:       tuple   = config.get('final_position')
+    start_default: tuple = config.get('initial_position')
+    file_name: str = config.get('colliders')
+    safety_distance: int = config.get('safety_distance')
+    goal_default: tuple = config.get('final_position')
 
     test_simulation_lidar(start_default, file_name, safety_distance, goal_default)

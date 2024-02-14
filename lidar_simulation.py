@@ -26,6 +26,17 @@ def get_distance(next_node: tuple, current_node: tuple) -> float:
     return np.sqrt(x_diff**2 + y_diff**2)
 
 
+def convert_to_degrees(radians: float):
+    """
+    :param radians: angle in radiance in R range
+    :return: angle in range [0, 360) degrees
+    """
+    angle = math.degrees(radians)
+    if angle < 0:
+        angle += 360  # Adjust negative degrees to positive range
+    return angle
+
+
 class LidarSimulation:
 
     """ The object will contain measurement results as an angle and distance toward obstacle
