@@ -1,9 +1,8 @@
 import socket
 import struct
 from typing import List
-from lidar_simulation import get_distance, get_vector_angle, convert_to_degrees
+from common_functions import get_distance, get_vector_angle, convert_to_degrees
 import config
-from math import degrees
 
 
 # Point Type

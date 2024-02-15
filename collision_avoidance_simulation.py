@@ -1,6 +1,6 @@
 from map import Map
 import numpy as np
-from lidar_simulation import get_vector_angle, convert_to_degrees
+from common_functions import get_vector_angle, convert_to_degrees
 from typing import List, Tuple
 from math import cos, sin
 import matplotlib.pyplot as plt
@@ -66,7 +66,6 @@ class VFH:
         # determining angle that is the closest to the target point
         obstacle_free_sectors: List[int] = np.where(self.histogram <= self.threshold)[0]
         if len(obstacle_free_sectors) <= 0:
-            # TODO: make a procedure
             return -1
         # merge neighbor sectors
         merged_sectors: List[list] = []
@@ -278,6 +277,7 @@ def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goa
               l_param=config.get('l'),
               safety_distance=config.get('safety_distance'))
     vfh.update_measurements(lidar_simulation.get_values())
+    vfh.generate_vfh()
     vfh.get_rotation_angle(current_node=start, next_node=goal)
     vfh.show_histogram(current_node=start, env=map_2d)
 

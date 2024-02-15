@@ -6,8 +6,9 @@ from typing import Optional, Tuple
 from enum import Enum
 from collision_avoidance_simulation import VFH
 from math import sin, cos, radians
-from lidar_simulation import LidarSimulation, get_distance
-import time
+from lidar_simulation import LidarSimulation
+from lidar import LIDAR
+from common_functions import get_distance
 from map import Map
 import config
 
@@ -35,7 +36,8 @@ class IntelligentWheelchair:
     for different services
     """
     map: Map
-    lidar: LidarSimulation
+    lidar: LIDAR
+    lidar_sim: LidarSimulation
     name: Optional[str]
     current_position: Tuple[float, float]  # (y, x)
     current_angle: float  # in degrees
@@ -55,7 +57,7 @@ class IntelligentWheelchair:
         self.status = WheelchairStatus.IDLE.value
         self.current_position = current_position  # (y, x)
         self.current_angle = current_angle
-        self.lidar = lidar
+        self.lidar_sim = lidar
         self.map = env
 
     def __str__(self) -> str:
@@ -108,4 +110,5 @@ class IntelligentWheelchair:
 
     def stop(self) -> None:
         self.status = WheelchairStatus.WAITING.value
+        # TODO: make emergency stop
         pass
