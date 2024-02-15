@@ -18,10 +18,10 @@ path_save: './data_storage/path.csv'
 sector_angle: 1 # alpha constant of VFH
 a: 1
 b: 1
-l: 6 # max is 18. 6 is suggested
+l: 3 # max is 18. 6 is suggested
 vfh_threshold: 0.05 # *100%
 vfh_time_delay: 500 # ms
 vfh_height_threshold: 0.15 # cm
 
 # LIDAR blind angles
-blind_spot_range: [100, 290] # (from, to) range of blind spot in degrees
+blind_spot_range: [200, 290] # (from, to) range of blind spot in degrees

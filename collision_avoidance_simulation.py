@@ -65,7 +65,9 @@ class VFH:
             self.generate_vfh()
         # determining angle that is the closest to the target point
         obstacle_free_sectors: List[int] = np.where(self.histogram <= self.threshold)[0]
-        assert len(obstacle_free_sectors) > 0
+        if len(obstacle_free_sectors) <= 0:
+            # TODO: make a procedure
+            return -1
         # merge neighbor sectors
         merged_sectors: List[list] = []
         wide_sector = []
@@ -97,20 +99,8 @@ class VFH:
         self.steering_direction = best_angle
         return best_angle
 
-    def generate_vfh(self) -> None:
-        """ The function will generate the Vector Field Histogram
-        The magnitude of the obstacle is represented as a formula:
-        m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
-        where:
-        1. c[i][j] = certainty value
-        2. d[i][j] = distances to each obstacle
-        3. a and b are positive constants, where a = b*max(distance) if a is not provided
-        4. m[i][j] will be a one dimensional array consisting of values greater than 0
-
-        alpha is an angle division that should be in degrees
-        :returns np.array with shape: (n, 0)
-        """
-        self.histogram * 0  # reset histogram
+    def fill_histogram(self) -> None:
+        """ Array is filled according to the angle sector """
         highest_distance = max(self.measurements, key=lambda x: x[1])[1]
         if self.a is None:
             self.a = self.b * highest_distance
@@ -129,15 +119,42 @@ class VFH:
 
             sector: int = round(np.floor(angle/self.alpha))
             self.histogram[sector] += m
-        # update histogram in place
+
+    def neglect_angles(self, angles: tuple) -> None:
+        """ The function set probability of 1 (max) to the sectors, which should be automatically neglected
+        :param angles is a tuple representing (from, to) range of the angles to be neglected.
+        Both angles are included
+        """
+        start_sector = int(np.floor(angles[0] / self.alpha))
+        end_sector = int(np.floor(angles[1] / self.alpha))
+        for angle in range(start_sector, end_sector, self.alpha):
+            self.histogram[angle] = 1  # set max probability
+
+    def generate_vfh(self, blind_spot_range=None) -> None:
+        """ The function will generate the Vector Field Histogram
+        The magnitude of the obstacle is represented as a formula:
+        m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
+        where:
+        1. c[i][j] = certainty value
+        2. d[i][j] = distances to each obstacle
+        3. a and b are positive constants, where a = b*max(distance) if a is not provided
+        4. m[i][j] will be a one dimensional array consisting of values greater than 0
+
+        alpha is an angle division that should be in degrees
+        :param blind_spot_range is a tuple (from, to) to set the max probability
+        :returns np.array with shape: (n, 0)
+        """
+        self.empty_histogram()
+        self.fill_histogram()
         self.smooth_histogram(l=self.l)
         self.normalize_histogram()
+        if blind_spot_range is not None and type(blind_spot_range) == tuple: self.neglect_angles(angles=blind_spot_range)
 
     def get_histogram(self) -> np.array:
         return self.histogram
 
     def empty_histogram(self):
-        np.empty_like(self.histogram)
+        self.histogram * 0  # reset histogram
 
     def smooth_histogram(self, l: int) -> None:
         """ Initial mapping may appear ragged and cause errors in the selection of the steering direction
@@ -178,7 +195,6 @@ class VFH:
         The current location in (y, x) is coordinates of the wheelchair according to the map
         The grid with 1+distance: int and 0, where 1+distance is a certainty value of obstacle
         """
-        # TODO: increase accuracy.
         # create obstacle_grid simulation with zeros by default
         obstacle_grid = np.zeros((measuring_distance + 1, measuring_distance + 1))
         for value in self.measurements:

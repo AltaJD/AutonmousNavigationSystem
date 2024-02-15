@@ -1,12 +1,12 @@
-from map import Map
-from wheelchair import IntelligentWheelchair
+from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
 from collision_avoidance_simulation import VFH
+from wheelchair import IntelligentWheelchair
+from map import Map
 import config as config
 import sys
 import numpy as np
 import struct
 import time
-from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
 
 
 def main_simulation():
@@ -122,7 +122,7 @@ def main(show_histogram=None):
             vfh.update_measurements(lidar.get_values())
             if time_diff < config.get('vfh_time_delay'):
                 continue  # set a delay for collecting enough points
-            vfh.generate_vfh()
+            vfh.generate_vfh(blind_spot_range=(lidar.start_blind_spot, lidar.end_blind_spot))
             iteration += 1
             print("ITERATION: ", iteration)
             print("Cloud points num: ", validPointsNum)

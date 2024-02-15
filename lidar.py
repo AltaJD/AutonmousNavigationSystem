@@ -88,7 +88,6 @@ class LIDAR:
             angle:      float = get_vector_angle(current_node=current_position, next_node=(x, y))
             # neglect blind spots
             if self.start_blind_spot < convert_to_degrees(angle) < self.end_blind_spot:
-                print(f"ANGLE {convert_to_degrees(angle)} Has been skipped") # TODO: remove
                 continue
             # zip data
             record = (angle, distance)
