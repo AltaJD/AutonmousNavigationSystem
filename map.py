@@ -9,6 +9,7 @@ from tqdm import tqdm
 import csv
 import sys
 from math import sin, cos, radians
+from typing import List
 
 
 class Path:
@@ -123,6 +124,25 @@ class Path:
         return np.sqrt((position[0] - goal_position[0]) ** 2 + (position[1] - goal_position[1]) ** 2)
 
 
+class MapIsland:
+    id: int
+    name: str
+    coordinates: np.array  # [[x, y], [x, y]]
+    destination: List[int]  # [x, y]
+
+    def __init__(self, id: int, coordinates: np.array):
+        self.id = id
+        self.name = ""
+        self.coordinates = coordinates.copy()
+        self.destination = self.coordinates[0]
+
+    def set_name(self, new_name: str):
+        self.name = new_name
+
+    def set_destination(self, new_coordinate: List[int]):
+        self.destination = new_coordinate
+
+
 class Map:
     grid: np.array
     skeleton: np.array
@@ -133,6 +153,7 @@ class Map:
     path: Path
     start: tuple
     end: tuple
+    islands: List[MapIsland]
 
     def __init__(self, filename: str, size: int, safety_distance=0):
         """=== Function consider the Start and Goal position of North and East coordinates ===
@@ -145,6 +166,8 @@ class Map:
         self.grid, self.north_offset, self.east_offset = self.create_grid(obstacles_data)
         self.create_skeleton()
         self.normalize_grid()
+        self.islands = []
+        self.detect_map_islands()
 
     def select_start(self) -> tuple:
         sp = self.select_point(title="Select current position")
@@ -262,6 +285,29 @@ class Map:
             self.grid[(x, y + 1)] = 1
             self.grid[(x, y)] = 1
 
+    def detect_map_islands(self) -> None:
+        # FIXME. We should consider the x values as well.
+        indices: List[tuple] = np.argwhere(self.grid == 1)
+        island_coordinates = [indices[0]]
+        island_id = 0
+        progress_bar = tqdm(total=len(indices))
+        for i in range(0, len(indices)-1):
+            init_coord = indices[i]
+            next_coord = indices[i+1]
+            init_x, init_y = init_coord
+            x, y = next_coord
+            if abs(x - init_x) == 1 or abs(y - init_y) == 1:
+                island_coordinates.append([x, y])
+                continue
+            else:
+                self.islands.append(MapIsland(id=island_id, coordinates=np.array(island_coordinates)))
+                print('New Island')
+                print(self.islands[-1].coordinates)
+                island_coordinates.clear()  # reset since the new island has been found
+                island_id += 1
+                island_coordinates.append([x, y])
+            progress_bar.update()
+
     def normalize_grid(self) -> None:
         """ Convert the grid of 1s and 0s """
         now_time = time.time()
@@ -363,11 +409,17 @@ class Map:
 
     def show_path(self):
         """ The function shows two different paths to estimate performance """
-        # show obstacles
-        plt.imshow(self.grid, origin='lower')
         plt.imshow(self.grid, cmap='Greys', origin='lower', alpha=0.7)
         # show path 1
         plt.plot(self.path.waypoints[:, 1], self.path.waypoints[:, 0], 'r')
+        plt.show()
+
+    def show_islands(self):
+        # show obstacles
+        plt.imshow(self.grid, cmap='Greys', origin='lower', alpha=0.7)
+        # show islands
+        for island in self.islands:
+            plt.plot(island.coordinates[:, 1], island.coordinates[:, 0], 'r')
         plt.show()
 
 
@@ -379,8 +431,9 @@ if __name__ == '__main__':
     safety_distance: int = config.get('safety_distance')
     filename: str = config.get('colliders')
 
-    map = Map(filename, 10, safety_distance)
-    map.show_map()
+    testing_map = Map(filename, 10, safety_distance)
+    testing_map.show_islands()
+
     # start = map.select_start()
     # end = map.select_end()
     # map.create_path(start, end)
