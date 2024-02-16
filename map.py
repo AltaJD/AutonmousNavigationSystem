@@ -167,7 +167,6 @@ class Map:
         self.create_skeleton()
         self.normalize_grid()
         self.islands = []
-        self.detect_map_islands()
 
     def select_start(self) -> tuple:
         sp = self.select_point(title="Select current position")
@@ -285,28 +284,56 @@ class Map:
             self.grid[(x, y + 1)] = 1
             self.grid[(x, y)] = 1
 
-    def detect_map_islands(self) -> None:
-        # FIXME. We should consider the x values as well.
-        indices: List[tuple] = np.argwhere(self.grid == 1)
-        island_coordinates = [indices[0]]
-        island_id = 0
-        progress_bar = tqdm(total=len(indices))
-        for i in range(0, len(indices)-1):
-            init_coord = indices[i]
-            next_coord = indices[i+1]
-            init_x, init_y = init_coord
-            x, y = next_coord
-            if abs(x - init_x) == 1 or abs(y - init_y) == 1:
-                island_coordinates.append([x, y])
-                continue
-            else:
-                self.islands.append(MapIsland(id=island_id, coordinates=np.array(island_coordinates)))
-                print('New Island')
-                print(self.islands[-1].coordinates)
-                island_coordinates.clear()  # reset since the new island has been found
-                island_id += 1
-                island_coordinates.append([x, y])
-            progress_bar.update()
+    def get_island_coordinates(self, seed_point, threshold) -> np.array:
+        # Create a mask to store the regions where the algorithm has expanded
+        mask = np.zeros_like(self.grid, dtype=np.uint8)
+
+        # Set up a queue to store the points to be expanded
+        queue = []
+        queue.append(seed_point)
+
+        # Start the growing algorithm
+        while len(queue) > 0:
+            # Get the next point from the queue
+            current_point = queue.pop(0)
+            x = current_point[0]
+            y = current_point[1]
+            # Check if the current point is within the grid boundaries
+            if (0 <= y < self.grid.shape[1]) and (0 <= x < self.grid.shape[0]):
+                # Check if the current point is already expanded or not
+                if mask[x, y] == 0:
+                    # Check if the current point has a value of 1
+                    if self.grid[x, y] == threshold:
+                        # Expand the region by setting the pixel value and updating the mask
+                        mask[x, y] = threshold
+
+                        # Add the neighboring points to the queue for further expansion
+                        queue.append((x - 1, y))  # Left neighbor
+                        queue.append((x + 1, y))  # Right neighbor
+                        queue.append((x, y - 1))  # Top neighbor
+                        queue.append((x, y + 1))  # Bottom neighbor
+
+        # Find the coordinates of the regions with only 1s
+        segment_coordinates = np.argwhere(mask == 1)
+        return segment_coordinates
+
+    def add_island(self, name: str, coordinates: list) -> None:
+        island_id = len(self.islands)
+        island = MapIsland(id=island_id, coordinates=coordinates)
+        island.set_name(name)
+        self.islands.append(island)
+
+    def find_island(self) -> None:
+        # select the object we want to remember
+        init_coordinates = self.select_point(title="Select the object")
+        threshold = 1
+        # get all coordinates
+        island_coordinates = self.get_island_coordinates(seed_point=init_coordinates, threshold=threshold)
+        print("Island has been detected")
+        assert len(island_coordinates) > 0, "ERROR, island has not been found.\n"
+        # store the island details
+        island_name = input("Provide the name of the building / room: ")
+        self.add_island(name=island_name, coordinates=island_coordinates)
 
     def normalize_grid(self) -> None:
         """ Convert the grid of 1s and 0s """
@@ -351,12 +378,17 @@ class Map:
             valid.remove(Action.RIGHT)
         return valid
 
-    def save_map(self, grid_filename: str):
+    def save_map(self, grid_filename: str, skeleton_filename=None):
         """ Store the map into csv file """
         with open(grid_filename, 'w+') as file:
             wr = csv.writer(file)  # quoting=csv.QUOTE_ALL)
             wr.writerows(self.grid)
             file.close()
+        if skeleton_filename is not None:
+            with open(skeleton_filename, 'w+') as file:
+                wr = csv.writer(file)
+                wr.writerows(self.skeleton)
+                file.close()
         print(f'GRID HAS BEEN SAVED TO {grid_filename}')
 
     def read_grid(self, file_path, dtype) -> np.array:
@@ -373,7 +405,7 @@ class Map:
         self.skeleton = np.loadtxt(file_path, delimiter=',', dtype=dtype)
         return self.skeleton
 
-    def show_map(self, start=None, initial_vector=None, goal=None, path=None, save_path=None) -> None:
+    def show_map(self, start=None, initial_vector=None, goal=None, path=None, save_path=None, title="") -> None:
         """ Plot the graph using matplotlib to show objects based on the parameters
         If parameter is not provided, it will not be displayed on the map
         Parameter initial vector is a tuple (angle, length) of the vector
@@ -399,7 +431,7 @@ class Map:
             plt.quiver(start[1], start[0], sin(0) * length, cos(0) * length, color='r')
         if goal is not None:
             plt.plot(goal[1], goal[0], 'rx')
-
+        plt.title(title)
         plt.xlabel('EAST')
         plt.ylabel('NORTH')
         if save_path is not None:
@@ -416,10 +448,14 @@ class Map:
 
     def show_islands(self):
         # show obstacles
-        plt.imshow(self.grid, cmap='Greys', origin='lower', alpha=0.7)
+        plt.imshow(self.grid, origin='lower')
+        plt.imshow(self.skeleton, cmap='Greys', origin='lower', alpha=0.7)
         # show islands
         for island in self.islands:
-            plt.plot(island.coordinates[:, 1], island.coordinates[:, 0], 'r')
+            x_coords = [coord[1] for coord in island.coordinates]
+            y_coords = [coord[0] for coord in island.coordinates]
+            plt.plot(x_coords, y_coords, 'r')
+        plt.title("Objects selected")
         plt.show()
 
 
@@ -432,6 +468,7 @@ if __name__ == '__main__':
     filename: str = config.get('colliders')
 
     testing_map = Map(filename, 10, safety_distance)
+    testing_map.find_island()
     testing_map.show_islands()
 
     # start = map.select_start()
