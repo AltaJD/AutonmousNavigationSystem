@@ -25,3 +25,8 @@ vfh_height_threshold: 0.15 # cm
 
 # LIDAR blind angles
 blind_spot_range: [200, 290] # (from, to) range of blind spot in degrees
+
+# Island configuration
+font_size: 10
+islands_data_path: "data_storage/islands"
+islands_file_headers: ["ID", "Name", "Coordinate_x", "Coordinate_y"]

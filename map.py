@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas.errors
 from skimage.morphology import medial_axis
 from skimage.util import invert
 from behavioral_model import Action
@@ -10,6 +11,7 @@ import csv
 import sys
 from math import sin, cos, radians
 from typing import List
+import pandas as pd
 
 
 class Path:
@@ -129,18 +131,36 @@ class MapIsland:
     name: str
     coordinates: np.array  # [[x, y], [x, y]]
     destination: List[int]  # [x, y]
+    text_location: List[int]  # [x, y]
 
-    def __init__(self, id: int, coordinates: np.array):
+    def __init__(self, id: int, text_location: List[int]):
         self.id = id
         self.name = ""
-        self.coordinates = coordinates.copy()
-        self.destination = self.coordinates[0]
+        self.coordinates = np.zeros([2, 2])
+        self.text_location = text_location[::-1]
 
     def set_name(self, new_name: str):
         self.name = new_name
 
     def set_destination(self, new_coordinate: List[int]):
         self.destination = new_coordinate
+
+    def set_text_location(self, new_location: List[int]):
+        self.text_location = new_location
+
+    def update_coordinates(self, coordinates: np.array):
+        self.coordinates = coordinates
+
+    def show_island(self):
+        assert self.coordinates is not None, "ERROR: coordinates are not updated"
+        x = [coord[1] for coord in self.coordinates]
+        y = [coord[0] for coord in self.coordinates]
+        plt.plot(x, y, 'bo')
+        plt.text(self.text_location[0], self.text_location[1], self.name, fontsize=config.get('font_size'))
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.title('Plot of Island Coordinates')
+        plt.show()
 
 
 class Map:
@@ -167,16 +187,25 @@ class Map:
         self.create_skeleton()
         self.normalize_grid()
         self.islands = []
+        try:
+            self.get_islands()
+        except pandas.errors.EmptyDataError:
+            print(config.get("islands_data_path"), " is empty and has been skipped.")
 
     def select_start(self) -> tuple:
         sp = self.select_point(title="Select current position")
         if not self.valid_destination(sp, "Start"): raise Exception
-        return sp
+        self.start = sp
+        return self.start
 
     def select_end(self) -> tuple:
-        ep = self.select_point(title="Select destination")
-        if not self.valid_destination(ep, "Destination"): raise Exception
-        return ep
+        threshold = 1
+        selected_coord = self.select_point(start=self.start, title="Select Destination")
+        if self.valid_destination(coordinate=selected_coord):
+            self.end = selected_coord
+            return self.end
+        return self.get_island_destination(selected_destination=list(selected_coord),
+                                           threshold=threshold)
 
     def create_path(self, start, end) -> np.array:
         start_time = time.time()
@@ -317,13 +346,7 @@ class Map:
         segment_coordinates = np.argwhere(mask == 1)
         return segment_coordinates
 
-    def add_island(self, name: str, coordinates: list) -> None:
-        island_id = len(self.islands)
-        island = MapIsland(id=island_id, coordinates=coordinates)
-        island.set_name(name)
-        self.islands.append(island)
-
-    def find_island(self) -> None:
+    def add_island(self) -> None:
         # select the object we want to remember
         init_coordinates = self.select_point(title="Select the object")
         threshold = 1
@@ -333,7 +356,45 @@ class Map:
         assert len(island_coordinates) > 0, "ERROR, island has not been found.\n"
         # store the island details
         island_name = input("Provide the name of the building / room: ")
-        self.add_island(name=island_name, coordinates=island_coordinates)
+        island_id = len(self.islands)
+        island = MapIsland(id=island_id, text_location=list(init_coordinates))
+        island.set_name(island_name)
+        self.islands.append(island)
+        # save islands
+        compress_islands_data = [[island.id, island.name, island.text_location[0], island.text_location[1]]
+                                 for island in self.islands]
+        islands_df = pd.DataFrame(data=compress_islands_data, columns=config.get("islands_file_headers"))
+        islands_df.to_csv(config.get("islands_data_path"), header=True)  # mode="a" prevent overwriting file
+
+    def get_islands(self):
+        df = pd.read_csv(config.get("islands_data_path"))
+        # store the islands in the object
+        for i in range(df.shape[0]):
+            il_detail = df.iloc[i]
+            text_loc = [il_detail["Coordinate_y"], il_detail["Coordinate_x"]]
+            island = MapIsland(id=il_detail["ID"], text_location=text_loc)
+            island_coordinates = self.get_island_coordinates(text_loc, threshold=1)
+            island.set_name(new_name=il_detail["Name"])
+            island.update_coordinates(coordinates=island_coordinates)
+            self.islands.append(island)
+
+    def get_island_destination(self, selected_destination: List[int], threshold: int) -> tuple:
+        # get the destination coordinates
+        coordinates = self.get_island_coordinates(seed_point=selected_destination, threshold=threshold)
+        # convert coordinates to the list of the strings
+        coordinates = list(map(lambda x: str(x[0])+','+str(x[1]), coordinates))
+        print("Island has been detected")
+        assert len(coordinates) > 0, "ERROR, island has not been found.\n"
+        # check to which island the coord belongs
+        df = pd.read_csv(config.get("islands_data_path"), usecols=config.get("islands_file_headers"))
+        df['Coordinate'] = df.apply(lambda x: str(x["Coordinate_y"])+','+str(x["Coordinate_x"]), axis=1)
+        df["Detected"] = np.where((df["Coordinate"].isin(coordinates)), 1, 0)
+        detected_islands = df[df["Detected"] == 1].iloc[0]
+        print(detected_islands)
+        island = self.islands[detected_islands["ID"]]
+        island.update_coordinates(coordinates)
+        self.end = island.coordinates[0]
+        return self.end
 
     def normalize_grid(self) -> None:
         """ Convert the grid of 1s and 0s """
@@ -355,7 +416,6 @@ class Map:
     def valid_destination(self, coordinate: tuple, coordinate_name="") -> bool:
         """ Determine if the selected start and goal positions are valid for creating a path """
         if self.grid[coordinate[0], coordinate[1]] != 0:
-            print(f'INVALID coordinate {coordinate_name}. {self.grid[coordinate[0], coordinate[1]]}', file=sys.stderr)
             return False
         return True
 
@@ -452,9 +512,10 @@ class Map:
         plt.imshow(self.skeleton, cmap='Greys', origin='lower', alpha=0.7)
         # show islands
         for island in self.islands:
-            x_coords = [coord[1] for coord in island.coordinates]
-            y_coords = [coord[0] for coord in island.coordinates]
-            plt.plot(x_coords, y_coords, 'r')
+            plt.text(island.text_location[0],
+                     island.text_location[1],
+                     island.name,
+                     fontsize=config.get('font_size'))
         plt.title("Objects selected")
         plt.show()
 
@@ -462,14 +523,15 @@ class Map:
 if __name__ == '__main__':
     import config
 
-    start_default: tuple = config.get('initial_position')
-    goal_default: tuple = config.get('final_position')
-    safety_distance: int = config.get('safety_distance')
-    filename: str = config.get('colliders')
+    start_default: tuple    = config.get('initial_position')
+    safety_distance: int    = config.get('safety_distance')
+    filename: str           = config.get('colliders')
 
     testing_map = Map(filename, 10, safety_distance)
-    testing_map.find_island()
-    testing_map.show_islands()
+    testing_map.start = start_default
+    # testing_map.add_island()
+    testing_map.select_end()
+    # testing_map.show_islands()
 
     # start = map.select_start()
     # end = map.select_end()
