@@ -37,7 +37,7 @@ class VFH:
         self.l = l_param
         self.safety_distance = 0
         self.free_sectors_num = [(0, 0.0)]  # (num_of_sectors, time_in_ms)
-        self.histogram = np.zeros(int(360 / self.alpha)) # by default it contains only zeros
+        self.histogram = np.zeros(int(360 / self.alpha))  # by default it contains only zeros
         # set up figure instance
         fig, (ax1, ax2) = plt.subplots(2, 1)
         self.fig = fig
@@ -117,6 +117,7 @@ class VFH:
             assert m >= 0, "Magnitude is a negative number"
 
             sector: int = round(np.floor(angle/self.alpha))
+            if sector == 360: sector = 0
             self.histogram[sector] += m
 
     def neglect_angles(self, angles: tuple) -> None:
@@ -179,6 +180,7 @@ class VFH:
         highest_magnitude = max(self.histogram)
         # update threshold %
         self.threshold = self.get_threshold_magnitude(min_distance=self.safety_distance) / highest_magnitude
+        print(self.threshold)  # TODO: fix threshold calculation
         self.histogram = np.array([magnitude / highest_magnitude if highest_magnitude != 0 else 0 for magnitude in self.histogram])
 
     def get_threshold_magnitude(self, min_distance: float) -> float:
@@ -208,7 +210,7 @@ class VFH:
             obstacle_grid[location_y][location_x] = 1 + round(distance)
         return obstacle_grid
 
-    def show_histogram(self, current_node=None, target_node=None, env=None) -> None:
+    def show_histogram(self, current_node=None, target_node=None, env=None, show_rate=None) -> None:
         """
         The function is using plt to plot the histogram and
         the map of the environment as subplots
@@ -216,16 +218,19 @@ class VFH:
         The steering direction is indicated as a blue vector passed in degrees
          """
         # get x axis for histogram
-        x = np.arange(self.histogram.shape[0]) * config.get('sector_angle')
+
         self.ax1.clear()
         # plot histogram
         self.ax1.plot(self.histogram, color='b')
+        # plot threshold
+        x = np.zeros(self.histogram.shape[0]) + self.threshold
+        self.ax1.plot(x, color='r')
         self.ax1.set_xlabel('Angle (in degrees)')
         self.ax1.set_ylabel('Probability')
         self.ax1.set_title('Vector Field Histogram')
         if env is not None and current_node is not None:
-            self.show_map(env, current_node)
-        else:
+            self.show_map(env=env, current_node=current_node)
+        if show_rate is not None:
             self.show_free_sectors_num()
         if target_node is not None:
             plt.plot(target_node[1], target_node[0], 'gx')
@@ -254,7 +259,7 @@ class VFH:
         self.ax2.set_title('Environment map')
         # show the current location
         self.ax2.plot(current_node[1], current_node[0], 'rx')
-        self.ax2.figure.set_size_inches(10, 10)
+        self.ax2.figure.set_size_inches(12, 12)
 
     def show_free_sectors_num(self):
         # Extract the x and y values from the input data
@@ -279,7 +284,7 @@ def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goa
     vfh.update_measurements(lidar_simulation.get_values())
     vfh.generate_vfh()
     vfh.get_rotation_angle(current_node=start, next_node=goal)
-    vfh.show_histogram(current_node=start, env=map_2d)
+    vfh.show_histogram(current_node=start)
 
 
 if __name__ == '__main__':

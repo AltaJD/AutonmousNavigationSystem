@@ -5,7 +5,6 @@ from common_functions import get_distance, get_vector_angle, convert_to_degrees
 import config
 
 
-# Point Type
 class PointUnitree:
     def __init__(self, x, y, z, intensity, time, ring):
         self.x = x

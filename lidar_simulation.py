@@ -2,7 +2,7 @@
 It is used to prepare data processing upon application of real LIDAR and determine the performance of code
 """
 from queue import Queue
-import time
+import config
 import numpy as np
 import matplotlib.pyplot as plt
 from common_functions import get_distance, get_vector_angle
@@ -17,10 +17,16 @@ class LidarSimulation:
 
     measuring_radius: int  # radius is given in meters
     measurement_results: Queue  # queue of tuples (angle: float, distance: float)
+    start_blind_spot: int
+    end_blind_spot: int
+    current_angle: float  # current direction of the lidar
 
-    def __init__(self, radius: int):
+    def __init__(self, radius: int, direction: float):
         self.measuring_radius = radius
         self.measurement_results = Queue()
+        self.current_angle = direction
+        self.start_blind_spot = config.get('blind_spot_range')[0]
+        self.end_blind_spot   = config.get('blind_spot_range')[1]
 
     def __str__(self):
         text = f'LIDAR:\n' \
@@ -34,7 +40,6 @@ class LidarSimulation:
         The values are appended to the list for storage and easier data validation.
         :returns [(angle1, distance1), (angle2, distance2)]
         """
-        start_time = time.time()
         data = []
         while not self.measurement_results.empty():
             data.append(self.measurement_results.get())
@@ -52,7 +57,7 @@ class LidarSimulation:
         # Create an array of indices for the grid matrix
         indices = np.indices(grid.shape)
         # Calculate the distances from the initial coordinates (x, y) to all cells in the grid
-        distances = np.sqrt((indices[0] - current_node[0])**2 + (indices[1] - current_node[1])**2)
+        distances = np.sqrt((indices[0] - current_node[0])**2 + (indices[1] - current_node[1])**2)  # FIXME: overflow encountered
         # Find the indices of cells within the specified radius
         indices_within_radius = np.where(distances <= self.measuring_radius)
         # Get the coordinates of the cells within the radius
@@ -67,12 +72,13 @@ class LidarSimulation:
         Initial angle is given in degrees
         """
         coordinates = self.get_scanning_area(grid, current_location)
-        for coor in coordinates:
-            x, y = coor[0], coor[1] # get the coordinates x and y
-            if grid[x, y] == 1: # if obstacle is detected
+        for coord in coordinates:
+            x, y = coord[0], coord[1]  # get the coordinates x and y
+            if grid[x, y] == 1:  # if obstacle is detected
                 distance: float = get_distance(current_node=current_location, next_node=(x, y))
                 angle:    float = get_vector_angle(current_node=current_location, next_node=(x, y))
-                record = (angle, distance) # compress the data into tuple
+                angle += np.radians(self.current_angle)  # consider the current direction of the lidar
+                record = (angle, distance)  # compress the data into tuple
                 self.measurement_results.put(record)
         print('ENVIRONMENT HAS BEEN SCANNED')
 

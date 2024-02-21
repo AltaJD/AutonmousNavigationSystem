@@ -12,6 +12,7 @@ import sys
 from math import sin, cos, radians
 from typing import List
 import pandas as pd
+import config
 
 
 class Path:
@@ -236,6 +237,11 @@ class Map:
             ax.plot(start[1], start[0], 'rx')
         if goal is not None:
             ax.plot(goal[1], goal[0], 'rx')
+        for island in self.islands:
+            plt.text(island.text_location[0],
+                     island.text_location[1],
+                     island.name,
+                     fontsize=config.get('font_size'))
         # Show
         plt.show(block=False)
         plt.title(title)
@@ -501,7 +507,8 @@ class Map:
 
     def show_path(self):
         """ The function shows two different paths to estimate performance """
-        plt.imshow(self.grid, cmap='Greys', origin='lower', alpha=0.7)
+        plt.imshow(self.grid, origin='lower')
+        plt.imshow(self.skeleton, cmap='Greys', origin='lower', alpha=0.7)
         # show path 1
         plt.plot(self.path.waypoints[:, 1], self.path.waypoints[:, 0], 'r')
         plt.show()
@@ -521,15 +528,13 @@ class Map:
 
 
 if __name__ == '__main__':
-    import config
-
     start_default: tuple    = config.get('initial_position')
     safety_distance: int    = config.get('safety_distance')
     filename: str           = config.get('colliders')
 
     testing_map = Map(filename, 10, safety_distance)
     testing_map.start = start_default
-    # testing_map.add_island()
+    testing_map.add_island()
     testing_map.select_end()
     # testing_map.show_islands()
 

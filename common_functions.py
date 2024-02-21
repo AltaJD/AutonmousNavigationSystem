@@ -28,4 +28,6 @@ def convert_to_degrees(radians: float):
     angle = math.degrees(radians)
     if angle < 0:
         angle += 360  # Adjust negative degrees to positive range
+    if angle > 360:
+        angle %= 360
     return angle

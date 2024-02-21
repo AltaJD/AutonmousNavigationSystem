@@ -1,8 +1,8 @@
 from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
 from collision_avoidance_simulation import VFH
-from wheelchair import IntelligentWheelchair
+from wheelchair import IntelligentWheelchairSim
 from map import Map
-import config as config
+import config
 import sys
 import numpy as np
 import struct
@@ -12,20 +12,20 @@ import time
 def main_simulation():
     from lidar_simulation import LidarSimulation
     """ === Get configuration === """
-    safety_distance: float = config.get('safety_distance')
     filename: str = config.get('colliders')
     lidar_radius: int = config.get('lidar_radius')
     map_figure_size: int = config.get('map_figure_size')
+    wheelchair_direction = 0
 
     # prepare Map
-    env_map = Map(filename, map_figure_size, safety_distance)
+    env_map = Map(filename, map_figure_size)
     start = env_map.select_start()
     end = env_map.select_end()
     env_map.create_path(start, end)
     env_map.show_path()
 
     # prepare LIDAR
-    lidar_simulation = LidarSimulation(lidar_radius)
+    lidar_simulation = LidarSimulation(lidar_radius, direction=wheelchair_direction)
 
     # prepare VFH
     vfh = VFH(b=config.get('b'),
@@ -35,19 +35,21 @@ def main_simulation():
     vfh.update_measurements(lidar_simulation.get_values())
 
     # create Wheelchair
-    intel_wheelchair = IntelligentWheelchair(current_position=env_map.path.start,
-                                             current_angle=0,
-                                             lidar=lidar_simulation,
-                                             env=env_map)
+    intel_wheelchair = IntelligentWheelchairSim(current_position=env_map.path.start,
+                                                current_angle=wheelchair_direction,
+                                                lidar_simulation=lidar_simulation,
+                                                env=env_map)
 
     path = env_map.path
     path_taken = []
     for coord in path.waypoints:
-        intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=False)
-        print(intel_wheelchair.current_position)
+        intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=True)
         path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
 
     """ Visualizing path taken by the simulation """
+    print("=== REACHED DESTINATION ===")
+    vfh.ax2.remove()
+    vfh.ax1.remove()
     env_map.path.waypoints = np.array(path_taken)  # change the generated path to path taken
     env_map.show_path()  # show path taken
 
@@ -146,4 +148,4 @@ def main(show_histogram=None):
 if __name__ == '__main__':
     if sys.version_info[0:2] != (3, 6):
         raise Exception('Requires python 3.6')
-    main(show_histogram=True)
+    main_simulation()

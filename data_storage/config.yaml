@@ -24,7 +24,7 @@ vfh_time_delay: 500 # ms
 vfh_height_threshold: 0.15 # cm
 
 # LIDAR blind angles
-blind_spot_range: [200, 290] # (from, to) range of blind spot in degrees
+blind_spot_range: [135, 225] # (from, to) range of blind spot in degrees
 
 # Island configuration
 font_size: 10
