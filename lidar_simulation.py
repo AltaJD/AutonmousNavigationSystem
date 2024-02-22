@@ -20,6 +20,7 @@ class LidarSimulation:
     start_blind_spot: int
     end_blind_spot: int
     current_angle: float  # current direction of the lidar
+    blind_spot_overflow: bool
 
     def __init__(self, radius: int, direction: float):
         self.measuring_radius = radius
@@ -27,6 +28,7 @@ class LidarSimulation:
         self.current_angle = direction
         self.start_blind_spot = config.get('blind_spot_range')[0]
         self.end_blind_spot   = config.get('blind_spot_range')[1]
+        self.blind_spot_overflow = False
 
     def __str__(self):
         text = f'LIDAR:\n' \
@@ -45,8 +47,41 @@ class LidarSimulation:
             data.append(self.measurement_results.get())
         data.sort() # sort by angle in ascending order
         if len(data) == 0:
-            return [(0, 0)]
+            return []
         return data
+
+    def update_blind_spot(self) -> None:
+        if not self.blind_spot_overflow:
+            delta = self.end_blind_spot - self.start_blind_spot
+        else:
+            delta = (360 - self.end_blind_spot) + self.start_blind_spot
+        print("OLD Blind spot: ", self.start_blind_spot, self.end_blind_spot)
+        print(self.blind_spot_overflow)
+        self.end_blind_spot += self.current_angle
+        if self.end_blind_spot < 0:
+            self.end_blind_spot += 360
+        if self.end_blind_spot > 360:
+            self.end_blind_spot %= 360
+        self.start_blind_spot += self.current_angle
+        if self.start_blind_spot < 0:
+            self.start_blind_spot += 360
+        if self.start_blind_spot > 360:
+            self.start_blind_spot %= 360
+
+        if self.end_blind_spot < self.start_blind_spot:
+            self.swap_blind_spot_range()
+
+        if self.end_blind_spot - self.start_blind_spot != delta:
+            self.blind_spot_overflow = True
+        else:
+            self.blind_spot_overflow = False
+        print("New Blind spot: ", self.start_blind_spot, self.end_blind_spot)
+        print(self.blind_spot_overflow)
+
+    def swap_blind_spot_range(self) -> None:
+        var = self.end_blind_spot
+        self.end_blind_spot = self.start_blind_spot
+        self.start_blind_spot = var
 
     def get_scanning_area(self, grid: np.array, current_node: tuple) -> np.array:
         """
@@ -72,6 +107,7 @@ class LidarSimulation:
         Initial angle is given in degrees
         """
         coordinates = self.get_scanning_area(grid, current_location)
+        self.update_blind_spot()
         for coord in coordinates:
             x, y = coord[0], coord[1]  # get the coordinates x and y
             if grid[x, y] == 1:  # if obstacle is detected

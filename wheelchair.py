@@ -8,7 +8,7 @@ from collision_avoidance_simulation import VFH
 from math import sin, cos, radians
 from lidar_simulation import LidarSimulation
 from lidar import LIDAR
-from common_functions import get_distance, get_vector_angle
+from common_functions import get_distance
 from map import Map
 import config
 
@@ -68,8 +68,10 @@ class IntelligentWheelchair:
 
     def stop(self) -> None:
         self.status = WheelchairStatus.WAITING.value
-        # TODO: make proper emergency stop
-        pass
+        # TODO: make proper emergency stop hardware call
+
+    def emergency_stop(self) -> None:
+        self.status = WheelchairStatus.INTERRUPTED.value
 
     def show_current_position(self) -> None:
         """
@@ -85,8 +87,9 @@ class IntelligentWheelchair:
         path = self.map.path.waypoints
         self.lidar.get_values()
         for waypoint in path:
+            if self.status == WheelchairStatus.INTERRUPTED.value:
+                break
             self.move_to(next_node=waypoint)
-            # TODO
 
     def move_to(self, next_node: List[int]) -> None:
         """ The function to communicate with the hardware control """
@@ -111,6 +114,7 @@ class IntelligentWheelchairSim:
     height: Optional[float]
     battery_level: float
     status: str
+    speed: float
 
     def __init__(self, current_position: tuple,
                  current_angle: float,
@@ -125,6 +129,7 @@ class IntelligentWheelchairSim:
         self.current_angle = current_angle
         self.lidar_sim = lidar_simulation
         self.map = env
+        self.speed = 0.5
 
     def __str__(self) -> str:
         return f"Class:\tIntelligentWheelchair\n" \
@@ -156,35 +161,40 @@ class IntelligentWheelchairSim:
             self.lidar_sim.scan(self.map.grid,
                                 current_location=self.current_position)
             vfh.update_measurements(self.lidar_sim.get_values())
-            vfh.generate_vfh(blind_spot_range=(self.lidar_sim.start_blind_spot, self.lidar_sim.end_blind_spot))  # TODO: change blind spot range
+            vfh.generate_vfh(blind_spot_range=(self.lidar_sim.start_blind_spot, self.lidar_sim.end_blind_spot),
+                             blind_spot_overflow=self.lidar_sim.blind_spot_overflow)
             """ Get parameters to the next node """
-            angle       = vfh.get_rotation_angle(current_node=self.current_position,
-                                                 next_node=target_node)
-            distance    = get_distance(target_node, self.current_position)
-            """ Get the next coordinates from VFH """
-            if self.lidar_sim.start_blind_spot < angle < self.lidar_sim.end_blind_spot:
-                print("Waypoint has been passed", file=sys.stderr)
+            angle = vfh.get_rotation_angle(current_node=self.current_position,
+                                           next_node=target_node)
+            if angle == -1:
+                self.emergency_stop()
+                print("NO FREE SPACE HAS BEEN FOUND", file=sys.stderr)
                 break
-            next_node:  tuple = self.next_coordinate(angle, distance)
+            distance = get_distance(target_node, self.current_position)
+            """ Get the next coordinates from VFH """
+            next_node: tuple = self.next_coordinate(angle, distance)
             """ Update wheelchair parameters """
-            self.current_position   = next_node
-            self.current_angle      = float(angle)
-            self.lidar_sim.current_angle = self.current_angle
-            reached_target: bool = (distance < distance_tolerance)
+            self.current_position = next_node
+            self.current_angle              = float(angle)
+            self.lidar_sim.current_angle    = float(angle)
+            if distance < distance_tolerance:
+                break
             """ Show the result """
             print(f"Current location:\t {self.current_position}\n"
                   f"Target location:\t {target_node}\n"
                   f"Steering direction:\t {self.current_angle}")
-
         if show_map:
             vfh.show_histogram(current_node=self.current_position,
                                env=self.map,
                                target_node=target_node)
+        print("Reached the Waypoint")
         self.stop()
 
     def stop(self) -> None:
         self.status = WheelchairStatus.WAITING.value
-        pass
+
+    def emergency_stop(self) -> None:
+        self.status = WheelchairStatus.INTERRUPTED.value
 
     def next_coordinate(self, angle: float, distance: float) -> tuple:
         """ Return the next coordinate
@@ -192,5 +202,5 @@ class IntelligentWheelchairSim:
         :param distance in m
         :return (x, y) as tuple
         """
-        return (distance * cos(radians(angle)) + self.current_position[0],
-                distance * sin(radians(angle)) + self.current_position[1])
+        return (self.speed*distance * cos(radians(angle)) + self.current_position[0],
+                self.speed*distance * sin(radians(angle)) + self.current_position[1])

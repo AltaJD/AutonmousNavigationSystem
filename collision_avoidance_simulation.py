@@ -31,12 +31,13 @@ class VFH:
         :param l_param: constant for smoothing histogram
         """
         self.safety_distance = safety_distance
+        self.threshold = config.get("vfh_threshold")
         self.alpha = alpha
         self.a = a
         self.b = b
         self.l = l_param
-        self.safety_distance = 0
-        self.free_sectors_num = [(0, 0.0)]  # (num_of_sectors, time_in_ms)
+        self.free_sectors_num = []  # [(num_of_sectors, time_in_ms)]
+        self.measurements = []
         self.histogram = np.zeros(int(360 / self.alpha))  # by default it contains only zeros
         # set up figure instance
         fig, (ax1, ax2) = plt.subplots(2, 1)
@@ -98,39 +99,60 @@ class VFH:
         self.steering_direction = best_angle
         return best_angle
 
+    def get_magnitude(self, d: float) -> float:
+        # d represents distance to the obstacle
+        c: float = d + 1  # certainty value
+        m: float = (c**2) * (self.a - self.b * d)  # magnitude
+        if m < 0:
+            m = 0
+        assert m >= 0, "Magnitude is a negative number"
+        return m
+
     def fill_histogram(self) -> None:
         """ Array is filled according to the angle sector """
+        if len(self.measurements) == 0:
+            # if no obstacles are detected, all probabilities are zero
+            return None
         highest_distance = max(self.measurements, key=lambda x: x[1])[1]
+        if highest_distance < self.safety_distance:
+            self.histogram += 1  # set all as 1s
+        assert highest_distance > 0, "HIGHEST DISTANCE IS 0"
         if self.a is None:
             self.a = self.b * highest_distance
         for i in range(len(self.measurements)):
             angle: float = self.measurements[i][0]  # radians
             angle = convert_to_degrees(angle)  # degrees
             distance: float = self.measurements[i][1]  # meters
-
-            c: float = distance + 1  # certainty value
-            m: float = (c**2) * (self.a - self.b * distance)  # magnitude # FIXME
-            if m < 0:
-                m = 0
-            # print("HIGHEST: ", highest_distance, distance)
-            # print("Magnitude: ", self.a - self.b * distance)
-            assert m >= 0, "Magnitude is a negative number"
-
+            if distance <= self.safety_distance:
+                m = self.get_magnitude(highest_distance)  # set max probability to avoid it
+            else:
+                m = self.get_magnitude(distance)
             sector: int = round(np.floor(angle/self.alpha))
-            if sector == 360: sector = 0
             self.histogram[sector] += m
 
-    def neglect_angles(self, angles: tuple) -> None:
+    def neglect_angles(self, angles: tuple, overflow: bool) -> None:
         """ The function set probability of 1 (max) to the sectors, which should be automatically neglected
         :param angles is a tuple representing (from, to) range of the angles to be neglected.
+        :param overflow is a bool responsible for detecting whether range (30, 270) is:
+        from 30 to 270 with blind spot width of 240 degrees
+        or
+        from 270 to 30 with blind spot width of 120 degrees
         Both angles are included
         """
+        # TODO: finish overflow integration
         start_sector = int(np.floor(angles[0] / self.alpha))
         end_sector = int(np.floor(angles[1] / self.alpha))
-        for angle in range(start_sector, end_sector, self.alpha):
-            self.histogram[angle] = 1  # set max probability
+        if not overflow:
+            for angle in range(start_sector, end_sector, self.alpha):
+                self.histogram[angle] = 1  # set max probability
+        else:
+            for angle in range(end_sector, int(360/self.alpha), self.alpha):
+                self.histogram[angle] = 1  # set max probability
+            for angle in range(0, start_sector, self.alpha):
+                self.histogram[angle] = 1  # set max probability
+        print(self.histogram)
 
-    def generate_vfh(self, blind_spot_range=None) -> None:
+    def generate_vfh(self, blind_spot_range=None, blind_spot_overflow=None) -> None:
         """ The function will generate the Vector Field Histogram
         The magnitude of the obstacle is represented as a formula:
         m[i][j] = (c[i][j])**2 * (a - b * d[i][j])
@@ -142,13 +164,21 @@ class VFH:
 
         alpha is an angle division that should be in degrees
         :param blind_spot_range is a tuple (from, to) to set the max probability
+
+        Parameters used for simulation testing only:
+        :param blind_spot_overflow is a bool responsible for detecting whether range (30, 270) is:
+        from 30 to 270 with blind spot width of 240 degrees
+        or
+        from 270 to 30 with blind spot width of 120 degrees
         :returns np.array with shape: (n, 0)
         """
         self.empty_histogram()
         self.fill_histogram()
         self.smooth_histogram(l=self.l)
         self.normalize_histogram()
-        if blind_spot_range is not None and type(blind_spot_range) == tuple: self.neglect_angles(angles=blind_spot_range)
+        if blind_spot_range is not None and type(blind_spot_range) == tuple:
+            self.neglect_angles(angles=blind_spot_range,
+                                overflow=blind_spot_overflow)
 
     def get_histogram(self) -> np.array:
         return self.histogram
@@ -178,9 +208,6 @@ class VFH:
 
     def normalize_histogram(self) -> None:
         highest_magnitude = max(self.histogram)
-        # update threshold %
-        self.threshold = self.get_threshold_magnitude(min_distance=self.safety_distance) / highest_magnitude
-        print(self.threshold)  # TODO: fix threshold calculation
         self.histogram = np.array([magnitude / highest_magnitude if highest_magnitude != 0 else 0 for magnitude in self.histogram])
 
     def get_threshold_magnitude(self, min_distance: float) -> float:
@@ -275,7 +302,7 @@ def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goa
     # test with simulation Lidar
     from lidar_simulation import LidarSimulation
     map_2d = Map(filename=filename, size=12, safety_distance=safety_distance)
-    lidar_simulation = LidarSimulation(radius=config.get('lidar_radius'))
+    lidar_simulation = LidarSimulation(radius=config.get('lidar_radius'), direction=0)
     lidar_simulation.scan(grid=map_2d.grid, current_location=start)
     vfh = VFH(b=config.get('b'),
               alpha=config.get('sector_angle'),

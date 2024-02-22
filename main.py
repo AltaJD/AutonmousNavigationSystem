@@ -1,6 +1,6 @@
 from lidar import LIDAR, PointUnitree, ScanUnitree, IMUUnitree
 from collision_avoidance_simulation import VFH
-from wheelchair import IntelligentWheelchairSim
+from wheelchair import IntelligentWheelchairSim, WheelchairStatus
 from map import Map
 import config
 import sys
@@ -45,6 +45,8 @@ def main_simulation():
     for coord in path.waypoints:
         intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=True)
         path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
+        if intel_wheelchair.status == WheelchairStatus.INTERRUPTED.value:
+            break
 
     """ Visualizing path taken by the simulation """
     print("=== REACHED DESTINATION ===")
@@ -54,19 +56,18 @@ def main_simulation():
     env_map.show_path()  # show path taken
 
 
-def show_scan_message(message: ScanUnitree, points_num: int) -> None:
-    """ Print raw data received from the LIDAR """
-    print("A Scan msg is parsed!")
-    print("\tstamp =", message.stamp, "id =", message.id)
-    print("\tScan size =", message.validPointsNum)
-    print("\tfirst 10 points (x, y, z, intensity, time, ring) =")
-    for i in range(min(points_num, message.validPointsNum)):
-        point = message.points[i]
-        print("\t", point.x, point.y, point.z, point.intensity, point.time, point.ring)
-    print("\n")
-
-
 def main(show_histogram=None):
+    def show_scan_message(message: ScanUnitree, points_num: int) -> None:
+        """ Print raw data received from the LIDAR """
+        print("A Scan msg is parsed!")
+        print("\tstamp =", message.stamp, "id =", message.id)
+        print("\tScan size =", message.validPointsNum)
+        print("\tfirst 10 points (x, y, z, intensity, time, ring) =")
+        for i in range(min(points_num, message.validPointsNum)):
+            point = message.points[i]
+            print("\t", point.x, point.y, point.z, point.intensity, point.time, point.ring)
+        print("\n")
+
     print("Testing real lidar")
     lidar = LIDAR()
     vfh = VFH(b=config.get('b'),
@@ -117,7 +118,7 @@ def main(show_histogram=None):
                 point = PointUnitree(*pointData)
                 scanPoints.append(point)
             scanMsg = ScanUnitree(stamp, id, validPointsNum, scanPoints)
-            # show_scan_message(scanMsg, 10)
+            show_scan_message(scanMsg, 10)
             """ Collect data """
             time_diff = round(time.time() - start_time, 4) * 1000  # in milliseconds
             lidar.append_values(scanMsg)
@@ -130,7 +131,8 @@ def main(show_histogram=None):
             print("Cloud points num: ", validPointsNum)
             print("Stored angle and distance values: ", len(lidar.values))
             print("BEST ANGLE: ",
-                  vfh.get_rotation_angle(current_node=(lidar.x, lidar.y), next_node=(lidar.x + 1, lidar.y)))
+                  vfh.get_rotation_angle(current_node=(lidar.x, lidar.y),
+                                         next_node=(lidar.x + 1, lidar.y)))
             # print("HISTOGRAM: ", vfh.histogram)
             # print("ANGLES AND DISTANCES: ", lidar.values)
             print(f"BLIND SPOT: from {lidar.start_blind_spot} to {lidar.end_blind_spot} degrees")

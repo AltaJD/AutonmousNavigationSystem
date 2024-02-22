@@ -55,7 +55,7 @@ class LIDAR:
     pointDataStr = "=fffffI"
     scanDataStr = "=dII" + 120 * "fffffI"
 
-    def __init__(self, max_height_threshold=config.get('vfh_height_threshold'), lidar_x=0, lidar_y=0, lidar_z=0):
+    def __init__(self, max_height_threshold=config.get('lidar_height_threshold'), lidar_x=0, lidar_y=0, lidar_z=0):
         self.measuring_radius = 0
         self.z_threshold = max_height_threshold
         self.start_blind_spot = config.get('blind_spot_range')[0]
