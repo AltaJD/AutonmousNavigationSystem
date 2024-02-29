@@ -139,7 +139,6 @@ class VFH:
         from 270 to 30 with blind spot width of 120 degrees
         Both angles are included
         """
-        # TODO: finish overflow integration
         start_sector = int(np.floor(angles[0] / self.alpha))
         end_sector = int(np.floor(angles[1] / self.alpha))
         if not overflow:
@@ -298,10 +297,12 @@ class VFH:
         self.ax2.set_ylabel('Number of Free Sectors')
 
 
-def test_simulation_lidar(start: tuple, filename: str, safety_distance: int, goal: tuple) -> None:
+def test_simulation_lidar(start: tuple, safety_distance: int, goal: tuple) -> None:
     # test with simulation Lidar
     from lidar_simulation import LidarSimulation
-    map_2d = Map(filename=filename, size=12, safety_distance=safety_distance)
+    map_2d = Map(map_image_size=12, safety_distance=safety_distance)
+    map_2d.load_grid(config.get('grid_save'), dtype=np.int)
+    map_2d.load_skeleton(config.get('skeleton_save'), dtype=np.int)
     lidar_simulation = LidarSimulation(radius=config.get('lidar_radius'), direction=0)
     lidar_simulation.scan(grid=map_2d.grid, current_location=start)
     vfh = VFH(b=config.get('b'),
@@ -321,4 +322,4 @@ if __name__ == '__main__':
     safety_distance: int = config.get('safety_distance')
     goal_default: tuple = config.get('final_position')
 
-    test_simulation_lidar(start_default, file_name, safety_distance, goal_default)
+    test_simulation_lidar(start_default, safety_distance, goal_default)

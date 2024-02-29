@@ -18,7 +18,9 @@ def main_simulation():
     wheelchair_direction = 0
 
     # prepare Map
-    env_map = Map(filename, map_figure_size)
+    env_map = Map(map_image_size=10)
+    env_map.load_grid(config.get('grid_save'), dtype=np.int)
+    env_map.load_skeleton(config.get('skeleton_save'), dtype=np.int)
     start = env_map.select_start()
     end = env_map.select_end()
     env_map.create_path(start, end)

@@ -176,22 +176,13 @@ class Map:
     end: tuple
     islands: List[MapIsland]
 
-    def __init__(self, filename: str, size: int, safety_distance=0):
+    def __init__(self, map_image_size: int, safety_distance=0):
         """=== Function consider the Start and Goal position of North and East coordinates ===
         Start = Goal = (North, East)
         """
-        self.size = size
+        self.size = map_image_size
         self.safe_d = safety_distance
-        # getting obstacle data
-        obstacles_data = np.loadtxt(filename, delimiter=',', dtype='Float64', skiprows=2)
-        self.grid, self.north_offset, self.east_offset = self.create_grid(obstacles_data)
-        self.create_skeleton()
-        self.normalize_grid()
         self.islands = []
-        try:
-            self.get_islands()
-        except pandas.errors.EmptyDataError:
-            print(config.get("islands_data_path"), " is empty and has been skipped.")
 
     def select_start(self) -> tuple:
         sp = self.select_point(title="Select current position")
@@ -246,7 +237,7 @@ class Map:
         plt.show(block=False)
         plt.title(title)
         # Wait for the user to click on the figure
-        points = plt.ginput(n=1, timeout=-1)
+        points = plt.ginput(n=1, timeout=10)  # 10 seconds for point selection
         # Close the figure
         plt.close(fig)
         # convert to the proper format
@@ -256,10 +247,11 @@ class Map:
     def create_skeleton(self) -> None:
         self.skeleton = medial_axis(invert(self.grid))
 
-    def create_grid(self, data):
+    def create_grid(self, file_name: str) -> None:
         """
         Create a 2.5D grid from given obstacle data.
         """
+        data = np.loadtxt(file_name, delimiter=',', dtype='Float64', skiprows=2)
         # minimum and maximum north coordinates
         north_min = np.floor(np.min(data[:, 0] - data[:, 3]))
         north_max = np.ceil(np.max(data[:, 0] + data[:, 3]))
@@ -288,7 +280,11 @@ class Map:
             obs = grid[obstacle[0]:obstacle[1] + 1, obstacle[2]:obstacle[3] + 1]
             np.maximum(obs, np.ceil(alt + d_alt + self.safe_d), obs)
         print("North offset = {0}, east offset = {1}".format(north_min, east_min))
-        return grid, int(north_min), int(east_min)
+        self.grid = grid
+        self.north_offset = int(north_min)
+        self.east_offset = int(east_min)
+        self.create_skeleton()
+        self.normalize_grid()
 
     def add_obstacles(self, n: int) -> None:
         """ The function add the obstacle locations to the main map
@@ -355,6 +351,9 @@ class Map:
     def add_island(self) -> None:
         # select the object we want to remember
         init_coordinates = self.select_point(title="Select the object")
+        if init_coordinates is None:
+            print("Island was not selected")
+            return None
         threshold = 1
         # get all coordinates
         island_coordinates = self.get_island_coordinates(seed_point=init_coordinates, threshold=threshold)
@@ -383,6 +382,7 @@ class Map:
             island.set_name(new_name=il_detail["Name"])
             island.update_coordinates(coordinates=island_coordinates)
             self.islands.append(island)
+        print("="*10+"Islands Loaded"+10*"=")
 
     def get_island_destination(self, selected_destination: List[int], threshold: int) -> tuple:
         # get the destination coordinates
@@ -457,19 +457,23 @@ class Map:
                 file.close()
         print(f'GRID HAS BEEN SAVED TO {grid_filename}')
 
-    def read_grid(self, file_path, dtype) -> np.array:
+    def load_grid(self, file_path, dtype) -> None:
         """ The function is reading the csv file to download 2D matrix
         This can be used for testing different normalizations and format of the maps
         """
         self.grid = np.loadtxt(file_path, delimiter=',', dtype=dtype)
-        return self.grid
+        print("="*10+"Grid Loaded"+10*"=")
+        try:
+            self.get_islands()
+        except pandas.errors.EmptyDataError:
+            print(config.get("islands_data_path"), " is empty and has been skipped.")
 
-    def read_skeleton(self, file_path, dtype) -> np.array:
+    def load_skeleton(self, file_path, dtype) -> None:
         """ The function is reading the csv file to download 2D matrix
         This can be used for testing different normalizations and format of the maps
         """
         self.skeleton = np.loadtxt(file_path, delimiter=',', dtype=dtype)
-        return self.skeleton
+        print("="*10+"Skeleton Loaded"+10*"=")
 
     def show_map(self, start=None, initial_vector=None, goal=None, path=None, save_path=None, title="") -> None:
         """ Plot the graph using matplotlib to show objects based on the parameters
@@ -527,18 +531,27 @@ class Map:
         plt.show()
 
 
-if __name__ == '__main__':
+def test_map_loading():
+    start_default: tuple    = config.get('initial_position')
+    safety_distance: int    = config.get('safety_distance')
+
+    testing_map = Map(10, safety_distance)
+    testing_map.load_grid(config.get('grid_save'), dtype=np.float)
+    testing_map.load_skeleton(config.get('skeleton_save'), dtype=np.int)
+    testing_map.start = start_default
+    testing_map.show_islands()
+
+
+def test_map_creation():
     start_default: tuple    = config.get('initial_position')
     safety_distance: int    = config.get('safety_distance')
     filename: str           = config.get('colliders')
 
-    testing_map = Map(filename, 10, safety_distance)
+    testing_map = Map(10, safety_distance)
+    testing_map.create_grid(file_name=filename)
     testing_map.start = start_default
-    testing_map.add_island()
-    testing_map.select_end()
-    # testing_map.show_islands()
+    testing_map.show_islands()
 
-    # start = map.select_start()
-    # end = map.select_end()
-    # map.create_path(start, end)
-    # map.show_path()
+
+if __name__ == '__main__':
+    test_map_loading()
