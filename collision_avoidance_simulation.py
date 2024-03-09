@@ -36,7 +36,7 @@ class VFH:
         self.a = a
         self.b = b
         self.l = l_param
-        self.free_sectors_num = []  # [(num_of_sectors, time_in_ms)]
+        self.free_sectors_num = [(0, 0.0)]  # [(num_of_sectors, time_in_ms)]
         self.measurements = []
         self.histogram = np.zeros(int(360 / self.alpha))  # by default it contains only zeros
         # set up figure instance
@@ -62,8 +62,6 @@ class VFH:
         :param current_node is the (x, y) of current location of the LIDAR/Wheelchair
         :return angle in degrees
         """
-        if self.histogram is None:
-            self.generate_vfh()
         # determining angle that is the closest to the target point
         obstacle_free_sectors: List[int] = np.where(self.histogram <= self.threshold)[0]
         if len(obstacle_free_sectors) <= 0:
@@ -102,7 +100,7 @@ class VFH:
     def get_magnitude(self, d: float) -> float:
         # d represents distance to the obstacle
         c: float = d + 1  # certainty value
-        m: float = (c**2) * (self.a - self.b * d)  # magnitude
+        m: float = (c ** 2) * (self.a - self.b * d)  # magnitude
         if m < 0:
             m = 0
         assert m >= 0, "Magnitude is a negative number"
@@ -127,7 +125,7 @@ class VFH:
                 m = self.get_magnitude(highest_distance)  # set max probability to avoid it
             else:
                 m = self.get_magnitude(distance)
-            sector: int = round(np.floor(angle/self.alpha))
+            sector: int = round(np.floor(angle / self.alpha))
             self.histogram[sector] += m
 
     def neglect_angles(self, angles: tuple, overflow: bool) -> None:
@@ -145,11 +143,10 @@ class VFH:
             for angle in range(start_sector, end_sector, self.alpha):
                 self.histogram[angle] = 1  # set max probability
         else:
-            for angle in range(end_sector, int(360/self.alpha), self.alpha):
+            for angle in range(end_sector, int(360 / self.alpha), self.alpha):
                 self.histogram[angle] = 1  # set max probability
             for angle in range(0, start_sector, self.alpha):
                 self.histogram[angle] = 1  # set max probability
-        print(self.histogram)
 
     def generate_vfh(self, blind_spot_range=None, blind_spot_overflow=None) -> None:
         """ The function will generate the Vector Field Histogram
@@ -207,12 +204,13 @@ class VFH:
 
     def normalize_histogram(self) -> None:
         highest_magnitude = max(self.histogram)
-        self.histogram = np.array([magnitude / highest_magnitude if highest_magnitude != 0 else 0 for magnitude in self.histogram])
+        self.histogram = np.array(
+            [magnitude / highest_magnitude if highest_magnitude != 0 else 0 for magnitude in self.histogram])
 
     def get_threshold_magnitude(self, min_distance: float) -> float:
         if self.a is None:
             self.a = self.b * min_distance
-        return ((min_distance+1)**2)*(self.a - self.b * min_distance)
+        return ((min_distance + 1) ** 2) * (self.a - self.b * min_distance)
 
     def get_obstacle_map(self, measuring_distance: int) -> np.array:
         """
@@ -297,9 +295,16 @@ class VFH:
         self.ax2.set_ylabel('Number of Free Sectors')
 
 
-def test_simulation_lidar(start: tuple, safety_distance: int, goal: tuple) -> None:
+if __name__ == '__main__':
+    """ Retrieve testing data """
+    start: tuple = config.get('initial_position')
+    file_name: str = config.get('colliders')
+    safety_distance: int = config.get('safety_distance')
+    goal: tuple = config.get('final_position')
+
     # test with simulation Lidar
     from lidar_simulation import LidarSimulation
+
     map_2d = Map(map_image_size=12, safety_distance=safety_distance)
     map_2d.load_grid(config.get('grid_save'), dtype=np.int)
     map_2d.load_skeleton(config.get('skeleton_save'), dtype=np.int)
@@ -313,13 +318,3 @@ def test_simulation_lidar(start: tuple, safety_distance: int, goal: tuple) -> No
     vfh.generate_vfh()
     vfh.get_rotation_angle(current_node=start, next_node=goal)
     vfh.show_histogram(current_node=start)
-
-
-if __name__ == '__main__':
-    """ Retrieve testing data """
-    start_default: tuple = config.get('initial_position')
-    file_name: str = config.get('colliders')
-    safety_distance: int = config.get('safety_distance')
-    goal_default: tuple = config.get('final_position')
-
-    test_simulation_lidar(start_default, safety_distance, goal_default)
