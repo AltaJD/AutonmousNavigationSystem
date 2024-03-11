@@ -3,6 +3,7 @@ import struct
 from typing import List
 from common_functions import get_distance, get_vector_angle, convert_to_degrees
 import config
+import math
 
 
 class PointUnitree:
@@ -40,7 +41,7 @@ class LIDAR:
     FIFO (First-In-First-Out)
     """
     values: List[tuple]
-    measuring_radius: float
+    current_angle: float
     z_threshold: float
     x: float
     y: float
@@ -56,7 +57,6 @@ class LIDAR:
     scanDataStr = "=dII" + 120 * "fffffI"
 
     def __init__(self, max_height_threshold=config.get('lidar_height_threshold'), lidar_x=0, lidar_y=0, lidar_z=0):
-        self.measuring_radius = 0
         self.z_threshold = max_height_threshold
         self.start_blind_spot = config.get('blind_spot_range')[0]
         self.end_blind_spot   = config.get('blind_spot_range')[1]
@@ -113,11 +113,76 @@ class LIDAR:
         # self.values.task_done()
         return self.values
 
+    def process_scan_data(self, data):
+        length = struct.unpack("=I", data[4:8])[0]
+        stamp = struct.unpack("=d", data[8:16])[0]
+        id_msg = struct.unpack("=I", data[16:20])[0]
+        valid_points_num = struct.unpack("=I", data[20:24])[0]
+        scan_points = []
+        point_start_addr = 24
+        for i in range(valid_points_num):
+            pointData = struct.unpack(self.pointDataStr, data[point_start_addr: point_start_addr + self.pointSize])
+            point_start_addr = point_start_addr + self.pointSize
+            point = PointUnitree(*pointData)
+            scan_points.append(point)
+        scan_msg = ScanUnitree(stamp, id_msg, valid_points_num, scan_points)
+        # show_scan_message(scan_msg, 10)
+        """=== Collect data ==="""
+        self.append_values(scan_msg)
+
     def get_socket(self):
         """ Create UDP socket """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((self.UDP_IP, self.UDP_PORT))
         return sock
+
+    def get_valid_points_num(self) -> int:
+        return len(self.values)
+
+    def update_imu_data(self, data) -> None:
+        length = struct.unpack("=I", data[4:8])[0]
+        imu_data = struct.unpack(self.imuDataStr, data[8:8 + self.imuDataSize])
+        imu = IMUUnitree(imu_data[0], imu_data[1], imu_data[2:6], imu_data[6:9], imu_data[9:12])
+        # Access the quaternion values from the IMU message
+        x = imu.quaternion[0]
+        y = imu.quaternion[1]
+        z = imu.quaternion[2]
+        w = imu.quaternion[3]
+
+        # Convert quaternion to Euler angles
+        # roll = math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
+        # pitch = math.asin(2 * (w * y - z * x))
+        yaw = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+
+        # Convert the yaw angle to degrees
+        yaw_degrees = math.degrees(yaw)
+
+        # Adjust the yaw angle to be within the range of [0, 360)
+        if yaw_degrees < 0:
+            yaw_degrees += 360
+
+        self.current_angle = yaw_degrees
+
+    @staticmethod
+    def show_scan_message(message: ScanUnitree, points_num: int) -> None:
+        """ Print raw data received from the LIDAR """
+        print("A Scan msg is parsed!")
+        print("\tstamp =", message.stamp, "id =", message.id)
+        print("\tScan size =", message.validPointsNum)
+        print("\tfirst 10 points (x, y, z, intensity, time, ring) =")
+        for i in range(min(points_num, message.validPointsNum)):
+            cloud_point = message.points[i]
+            print("\t", cloud_point.x, cloud_point.y, cloud_point.z, cloud_point.intensity, cloud_point.time, cloud_point.ring)
+        print("\n")
+
+    @staticmethod
+    def show_imu_message(message: IMUUnitree) -> None:
+        print("An IMU msg")
+        print("\tstamp =", message.stamp, "id =", message.id)
+        print("\tquaternion (x, y, z, w) =", message.quaternion)
+        print("\tangular velocity =", message.angular_velocity)
+        print("\tlinear acceleration =", message.linear_acceleration)
+        print("\n")
 
 
 def run_lidar_test(lidar: LIDAR):
@@ -147,7 +212,7 @@ def run_lidar_test(lidar: LIDAR):
             print("\n")
 
             # Update current position
-            lidar.update_position(x=imuMsg.quaternion[0], y=imuMsg.quaternion[1], z=imuMsg.quaternion[2])
+            # lidar.update_position(x=imuMsg.quaternion[0], y=imuMsg.quaternion[1], z=imuMsg.quaternion[2])
 
         elif msgType == 102:  # Scan Message
             length = struct.unpack("=I", data[4:8])[0]

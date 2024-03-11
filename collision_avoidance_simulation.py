@@ -48,7 +48,7 @@ class VFH:
     def update_measurements(self, values: List[tuple]):
         self.measurements = values
 
-    def update_free_sectors(self, num: int, time: float):
+    def update_free_sectors_num(self, num: int, time: float):
         last_time = self.free_sectors_num[-1][1]  # get time
         time += last_time
         self.free_sectors_num.append((num, time))
@@ -127,6 +127,7 @@ class VFH:
                 m = self.get_magnitude(distance)
             sector: int = round(np.floor(angle / self.alpha))
             self.histogram[sector] += m
+        assert len(np.where(self.histogram == 1)) != len(self.histogram), "ERROR. Safety distance is too low"
 
     def neglect_angles(self, angles: tuple, overflow: bool) -> None:
         """ The function set probability of 1 (max) to the sectors, which should be automatically neglected
