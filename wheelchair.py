@@ -1,5 +1,4 @@
 import sys
-from typing import List
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import Optional, Tuple
@@ -8,7 +7,7 @@ from collision_avoidance_simulation import VFH
 from math import sin, cos, radians
 from lidar_simulation import LidarSimulation
 from lidar import LIDAR
-from common_functions import get_distance
+from common_functions import get_distance, get_angle_difference
 from map import Map
 import config
 
@@ -24,6 +23,7 @@ class WheelchairStatus(Enum):
     ERROR = in case the path was not found or any program bug has occurred
     """
     MOVING = 'MOVING'
+    ROTATING = 'ROTATING'
     IDLE = 'IDLE'
     WAITING = 'WAITING'
     INTERRUPTED = 'INTERRUPTED'
@@ -37,11 +37,10 @@ class IntelligentWheelchair:
     """
     map: Map
     lidar: LIDAR
-    name: Optional[str]
     current_position: Tuple[float, float]  # (y, x)
     current_angle: float  # in degrees
-    current_speed: float
-    goal_position: tuple
+    goal_angle: float
+    goal_distance: float
     length: float
     width: float
     height: Optional[float]
@@ -57,14 +56,14 @@ class IntelligentWheelchair:
         self.current_angle = current_angle
         self.lidar = lidar
         self.map = env
+        self.goal_angle = -1  # set invalid angle by default
 
     def __str__(self) -> str:
         return f"Class:\tIntelligentWheelchair\n" \
-               f"Name:\t{self.name}\n" \
                f"Current position:\t{self.current_position}\n" \
                f"Current angle:\t{self.current_angle}\n" \
-               f"Goal position:\t{self.goal_position}\n" \
-               f"Size (l,w, h):\t{(self.length, self.width, self.height)}\n"
+               f"Size (l,w, h):\t{(self.length, self.width, self.height)}\n" \
+               f"Status:\t{self.status}"
 
     def stop(self) -> None:
         self.status = WheelchairStatus.WAITING.value
@@ -72,6 +71,7 @@ class IntelligentWheelchair:
 
     def emergency_stop(self) -> None:
         self.status = WheelchairStatus.INTERRUPTED.value
+        # TODO: make proper emergency emergency hardware call
 
     def show_current_position(self) -> None:
         """
@@ -83,18 +83,39 @@ class IntelligentWheelchair:
         plt.plot(self.current_position[0], self.current_position[1], 'rx')
         plt.show()
 
-    def start(self) -> None:
-        path = self.map.path.waypoints
-        self.lidar.get_values()
-        for waypoint in path:
-            if self.status == WheelchairStatus.INTERRUPTED.value:
-                break
-            self.move_to(next_node=waypoint)
-
-    def move_to(self, next_node: List[int]) -> None:
-        """ The function to communicate with the hardware control """
-        # TODO: make hardware communication for the motors
+    def move_forward(self, d: float) -> None:
+        self.status = WheelchairStatus.MOVING.value
+        # TODO: add hardware communication
+        print("STATUS: ", self.status)
+        self.stop()
         pass
+
+    def rotate(self, angle: float) -> None:
+        print(f"LIDAR: {self.lidar.current_angle}\t"
+              f"WHEELCHAIR: {self.current_angle}\t"
+              f"GOAL: {self.goal_angle}\t"
+              f"DIFF: {angle}\t"
+              f"DIRECTION: {self.status}")
+        # TODO: add hardware communication
+        # self.stop()
+        pass
+
+    def move_to(self, direction_angle: float, distance: float) -> None:
+        """ The function to communicate with the hardware control
+        :param direction_angle is an angle in degrees
+        :param distance is distance in m toward goal
+        """
+        # TODO: refactor
+        # angle by which the wheelchair has rotated
+        rotated_angle, rotating_direction = get_angle_difference(self.lidar.current_angle,
+                                                                 self.current_angle)
+        rotation_angle_left, self.status = get_angle_difference(direction_angle,
+                                                                rotated_angle)
+        self.goal_angle = direction_angle
+        if rotation_angle_left != 0:
+            self.rotate(angle=rotation_angle_left)
+        else:
+            self.move_forward(distance)
 
 
 class IntelligentWheelchairSim:
@@ -139,12 +160,12 @@ class IntelligentWheelchairSim:
                f"Goal position:\t{self.goal_position}\n" \
                f"Size (l,w, h):\t{(self.length, self.width, self.height)}\n"
 
-    def show_current_position(self, map: np.array) -> None:
+    def show_current_position(self, env: np.array) -> None:
         """
         The function is showing the recent location of wheelchair
         and presents on the map using plt
         """
-        plt.imshow(map)
+        plt.imshow(env)
         plt.plot(self.current_position[0], self.current_position[1], 'rx')
         plt.show()
 
@@ -175,8 +196,8 @@ class IntelligentWheelchairSim:
             next_node: tuple = self.next_coordinate(angle, distance)
             """ Update wheelchair parameters """
             self.current_position = next_node
-            self.current_angle              = float(angle)
-            self.lidar_sim.current_angle    = float(angle)
+            self.current_angle = float(angle)
+            self.lidar_sim.current_angle = float(angle)
             if distance < distance_tolerance:
                 break
             """ Show the result """
@@ -202,5 +223,5 @@ class IntelligentWheelchairSim:
         :param distance in m
         :return (x, y) as tuple
         """
-        return (self.speed*distance * cos(radians(angle)) + self.current_position[0],
-                self.speed*distance * sin(radians(angle)) + self.current_position[1])
+        return (self.speed * distance * cos(radians(angle)) + self.current_position[0],
+                self.speed * distance * sin(radians(angle)) + self.current_position[1])

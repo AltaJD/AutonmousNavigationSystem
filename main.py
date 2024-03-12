@@ -1,6 +1,6 @@
 from lidar import LIDAR
 from collision_avoidance_simulation import VFH
-from wheelchair import IntelligentWheelchairSim, WheelchairStatus
+from wheelchair import IntelligentWheelchairSim, IntelligentWheelchair, WheelchairStatus
 from map import Map
 import config
 import numpy as np
@@ -58,17 +58,25 @@ def main_simulation():
 
 
 def main(show_histogram=None):
+    print("Testing real lidar")
     lidar = LIDAR()
     vfh = VFH(b=config.get('b'),
               alpha=config.get('sector_angle'),
               l_param=config.get('l'),
               safety_distance=config.get('safety_distance'))
+    env_map = Map()
+    env_map.load_grid(config.get('grid_save'), dtype=np.int)
+    env_map.load_skeleton(config.get('skeleton_save'), dtype=np.int)
+    wheelchair = IntelligentWheelchair(current_position=(0, 0),
+                                       current_angle=lidar.current_angle,
+                                       lidar=lidar,
+                                       env=env_map)
+    wheelchair.status = WheelchairStatus.IDLE.value
     sock = lidar.get_socket()
-    print("Testing real lidar")
     iteration = 0
     start_time = time.time()
 
-    while True:
+    while wheelchair.status != WheelchairStatus.INTERRUPTED.value:
         # Recv data
         data, addr = sock.recvfrom(10000)
         # print(f"Received data from {addr[0]}:{addr[1]}")
@@ -78,7 +86,6 @@ def main(show_histogram=None):
         if msg_type == 101:  # IMU Message
             """=== Process new position of the LIDAR ==="""
             lidar.update_imu_data(data)
-            print("ROTATION ANGLE: ", lidar.current_angle)
 
         elif msg_type == 102:  # Scan Message
             """=== Preprocess received data ==="""
@@ -87,6 +94,7 @@ def main(show_histogram=None):
             vfh.update_measurements(lidar.get_values())
             if time_diff < config.get('vfh_time_delay'):
                 continue  # set a delay for collecting enough points
+
             """=== Generate VFH ==="""
             vfh.generate_vfh(blind_spot_overflow=False, blind_spot_range=(lidar.start_blind_spot,
                                                                           lidar.end_blind_spot))
@@ -94,23 +102,26 @@ def main(show_histogram=None):
                                                         next_node=DESTINATION)
             processing_time = round(time.time() - start_time, 4) * 1000  # processing time in ms
             vfh.update_free_sectors_num(num=vfh.get_free_sectors_num(), time=processing_time)
+            wheelchair.move_to(steering_direction, 1.0)
             """=== Show the results ==="""
             # print("ITERATION: ", iteration)
             # print("Cloud points num: ", lidar.get_valid_points_num())
-            print("BEST ANGLE: ", steering_direction)
             # print("HISTOGRAM: ", vfh.histogram)
             # print("ANGLES AND DISTANCES: ", lidar.values)
             # print(f"BLIND SPOT: from {lidar.start_blind_spot} to {lidar.end_blind_spot} degrees")
+            # print("=" * 10 + f"Received {len(lidar.values)} LIDAR points  in {processing_time} ms" + 10 * "=")
             if show_histogram is True:
                 vfh.show_histogram()
+
             """=== Reset values ==="""
             lidar.empty_values()
             vfh.empty_histogram()
             start_time = time.time()
             iteration += 1
-            # print("=" * 10 + f"Received {len(lidar.values)} LIDAR points  in {processing_time} ms" + 10 * "=")
+
+        # print("STATUS: ", wheelchair.status)
     sock.close()
 
 
 if __name__ == '__main__':
-    main(show_histogram=False)
+    main(show_histogram=True)

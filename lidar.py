@@ -58,6 +58,7 @@ class LIDAR:
 
     def __init__(self, max_height_threshold=config.get('lidar_height_threshold'), lidar_x=0, lidar_y=0, lidar_z=0):
         self.z_threshold = max_height_threshold
+        self.current_angle = 0.0
         self.start_blind_spot = config.get('blind_spot_range')[0]
         self.end_blind_spot   = config.get('blind_spot_range')[1]
         self.x = lidar_x
@@ -144,10 +145,10 @@ class LIDAR:
         imu_data = struct.unpack(self.imuDataStr, data[8:8 + self.imuDataSize])
         imu = IMUUnitree(imu_data[0], imu_data[1], imu_data[2:6], imu_data[6:9], imu_data[9:12])
         # Access the quaternion values from the IMU message
-        x = imu.quaternion[0]
-        y = imu.quaternion[1]
-        z = imu.quaternion[2]
-        w = imu.quaternion[3]
+        x = round(imu.quaternion[0], 3)
+        y = round(imu.quaternion[1], 3)
+        z = round(imu.quaternion[2], 3)
+        w = round(imu.quaternion[3], 3)
 
         # Convert quaternion to Euler angles
         # roll = math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
@@ -156,6 +157,7 @@ class LIDAR:
 
         # Convert the yaw angle to degrees
         yaw_degrees = math.degrees(yaw)
+        yaw_degrees = round(yaw_degrees)
 
         # Adjust the yaw angle to be within the range of [0, 360)
         if yaw_degrees < 0:

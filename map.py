@@ -176,7 +176,7 @@ class Map:
     end: tuple
     islands: List[MapIsland]
 
-    def __init__(self, map_image_size: int, safety_distance=0):
+    def __init__(self, map_image_size=12, safety_distance=0):
         """=== Function consider the Start and Goal position of North and East coordinates ===
         Start = Goal = (North, East)
         """

@@ -31,3 +31,28 @@ def convert_to_degrees(radians: float):
     if angle >= 360:
         angle %= 360
     return angle
+
+
+def get_angle_difference(angle1, angle2):
+    """
+    Calculates the difference between two angles in degrees.
+    The result will always be positive and in the range of 0 to 180 degrees.
+    """
+
+    # Normalize the angles to be between 0 and 360 degrees
+    angle1 = angle1 % 360
+    angle2 = angle2 % 360
+
+    # Calculate the absolute difference between the angles
+    diff = abs(angle1 - angle2)
+
+    # Determine the direction of rotation
+    if angle1 < angle2:
+        direction = "right"
+    else:
+        direction = "left"
+
+    # Take the smaller difference between the angles
+    diff = min(diff, 360 - diff)
+
+    return diff, direction
