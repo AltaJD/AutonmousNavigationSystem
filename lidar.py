@@ -115,7 +115,7 @@ class LIDAR:
         return self.values
 
     def process_scan_data(self, data):
-        length = struct.unpack("=I", data[4:8])[0]
+        # length = struct.unpack("=I", data[4:8])[0]
         stamp = struct.unpack("=d", data[8:16])[0]
         id_msg = struct.unpack("=I", data[16:20])[0]
         valid_points_num = struct.unpack("=I", data[20:24])[0]
@@ -141,7 +141,7 @@ class LIDAR:
         return len(self.values)
 
     def update_imu_data(self, data) -> None:
-        length = struct.unpack("=I", data[4:8])[0]
+        # length = struct.unpack("=I", data[4:8])[0]
         imu_data = struct.unpack(self.imuDataStr, data[8:8 + self.imuDataSize])
         imu = IMUUnitree(imu_data[0], imu_data[1], imu_data[2:6], imu_data[6:9], imu_data[9:12])
         # Access the quaternion values from the IMU message

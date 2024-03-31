@@ -44,7 +44,7 @@ def main_simulation():
     path = env_map.path
     path_taken = []
     for coord in path.waypoints:
-        intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=True)
+        intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=False)
         path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
         if intel_wheelchair.status == WheelchairStatus.INTERRUPTED.value:
             break
@@ -100,6 +100,8 @@ def main(show_histogram=None):
                                                                           lidar.end_blind_spot))
             steering_direction = vfh.get_rotation_angle(current_node=(lidar.x, lidar.y),
                                                         next_node=DESTINATION)
+            if steering_direction == -1:
+                wheelchair.stop()
             processing_time = round(time.time() - start_time, 4) * 1000  # processing time in ms
             vfh.update_free_sectors_num(num=vfh.get_free_sectors_num(), time=processing_time)
             wheelchair.move_to(steering_direction, 1.0)

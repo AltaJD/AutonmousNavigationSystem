@@ -112,8 +112,6 @@ class VFH:
             # if no obstacles are detected, all probabilities are zero
             return None
         highest_distance = max(self.measurements, key=lambda x: x[1])[1]
-        if highest_distance < self.safety_distance:
-            self.histogram += 1  # set all as 1s
         assert highest_distance > 0, "HIGHEST DISTANCE IS 0"
         if self.a is None:
             self.a = self.b * highest_distance
@@ -127,7 +125,6 @@ class VFH:
                 m = self.get_magnitude(distance)
             sector: int = round(np.floor(angle / self.alpha))
             self.histogram[sector] += m
-        assert len(np.where(self.histogram == 1)) != len(self.histogram), "ERROR. Safety distance is too low"
 
     def neglect_angles(self, angles: tuple, overflow: bool) -> None:
         """ The function set probability of 1 (max) to the sectors, which should be automatically neglected
@@ -176,6 +173,12 @@ class VFH:
         if blind_spot_range is not None and type(blind_spot_range) == tuple:
             self.neglect_angles(angles=blind_spot_range,
                                 overflow=blind_spot_overflow)
+
+        """ Consider safety distance """
+        closest_distance = min(self.measurements, key=lambda x: x[1])[1]
+        if closest_distance <= self.safety_distance:
+            print("CLOSEST", closest_distance)
+            self.histogram = np.ones(int(360 / self.alpha))  # set as 1
 
     def get_histogram(self) -> np.array:
         return self.histogram
@@ -300,7 +303,7 @@ if __name__ == '__main__':
     """ Retrieve testing data """
     start: tuple = config.get('initial_position')
     file_name: str = config.get('colliders')
-    safety_distance: int = config.get('safety_distance')
+    safety_distance: float = config.get('safety_distance')
     goal: tuple = config.get('final_position')
 
     # test with simulation Lidar
@@ -314,7 +317,7 @@ if __name__ == '__main__':
     vfh = VFH(b=config.get('b'),
               alpha=config.get('sector_angle'),
               l_param=config.get('l'),
-              safety_distance=config.get('safety_distance'))
+              safety_distance=safety_distance)
     vfh.update_measurements(lidar_simulation.get_values())
     vfh.generate_vfh()
     vfh.get_rotation_angle(current_node=start, next_node=goal)
