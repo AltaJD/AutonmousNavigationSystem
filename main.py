@@ -6,17 +6,25 @@ import config
 import numpy as np
 import struct
 import time
+import threading
 
 
 class AutonomousNavigationProgram:
     destination: tuple  # tuple of floats
-    start_program: bool
+    interrupt_program: bool
     show_histogram: bool
 
     def __init__(self):
         self.destination = (0.1033686161041259766, 0.0)  # (x, y)
-        self.start_program = True
+        self.interrupt_program = False
         self.show_histogram = False
+
+    def testing_run(self):
+        print("Start listening to LIDAR")
+        while not self.interrupt_program:
+            print("HI")
+        else:
+            print("Testing Run has been successfully stopped")
 
     def run(self):
         print("Start listening to LIDAR")
@@ -39,7 +47,7 @@ class AutonomousNavigationProgram:
 
         emergency_stop: bool = wheelchair.status == WheelchairStatus.INTERRUPTED.value
 
-        while self.start_program and not emergency_stop:
+        while self.interrupt_program and not emergency_stop:
             # Recv data
             data, addr = sock.recvfrom(10000)
             # print(f"Received data from {addr[0]}:{addr[1]}")
@@ -86,6 +94,7 @@ class AutonomousNavigationProgram:
 
             # print("STATUS: ", wheelchair.status)
         wheelchair.stop()
+        print("ANP has been successfully stopped")
         sock.close()
 
     @staticmethod
@@ -138,6 +147,28 @@ class AutonomousNavigationProgram:
 
 autonomous_navigation_program = AutonomousNavigationProgram()
 
+
+def start_testing_run():
+    autonomous_navigation_program.testing_run()  # select the method to run
+
+
+# Create a thread and start it
+thread = threading.Thread(target=start_testing_run, daemon=True)
+
+
+def start_program():
+    thread.start()
+    # thread.join()  # freezing the main thread until thread stops
+
+
+def interrupt_program():
+    autonomous_navigation_program.interrupt_program = True
+
+
 if __name__ == '__main__':
-    autonomous_navigation_program.show_histogram = True
-    autonomous_navigation_program.run()
+    start_time = time.time()
+    start_program()
+    time.sleep(1)  # 2 seconds
+    interrupt_program()
+    print(f"Program stopped after: {time.time()-start_time} seconds")
+
