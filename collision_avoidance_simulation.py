@@ -10,7 +10,7 @@ import config
 class VFH:
     desired_direction: float  # represents the angle from current node to target node
     steering_direction: float
-    measurements: List[tuple]
+    measurements: List[tuple]  # first value is a distance and second is an angle in tuple
     free_sectors_num: List[Tuple[int, float]]  # number of obstacle-free sectors to evaluate performance of LIDAR
     histogram: np.array  # histogram represented as np.array with a shape (n, 0)
     threshold: float  # in % specifies the minimum obstacle probability acceptable as obstacle-free path
@@ -174,10 +174,32 @@ class VFH:
             self.neglect_angles(angles=blind_spot_range,
                                 overflow=blind_spot_overflow)
 
-        """ Consider safety distance """
-        closest_distance = min(self.measurements, key=lambda x: x[1])[1]
-        if closest_distance <= self.safety_distance:
-            print("CLOSEST", closest_distance)
+        self.detect_danger(observation_range=config.get("observation_range"))
+
+    def detect_danger(self, observation_range: list) -> None:
+        """ The function to determine whether the danger ahead
+        If obstacle closer than safety distance, the machine should stop
+        Sets the whole histogram as 1 => best angle becomes -1 and machine stops
+        """
+        def angle_within_range(angles: list, target_angle: int) -> bool:
+            normalized_angle = target_angle % 360
+            if angles[0] <= normalized_angle <= angles[1]:
+                print('WITHIN RANGE !!!!!!!!!!!!!!!!!!!!!!!!!!')
+                return True
+            return False
+
+        def get_lowest_dist_tuple() -> tuple:
+            min_distance = float('inf')
+            result = (-1, -1)
+            for angle, dist in self.measurements:
+                if dist < min_distance:
+                    min_distance = dist
+                    result = (dist, convert_to_degrees(angle))
+            return result
+
+        closest_distance, targ_angle = get_lowest_dist_tuple()
+        print("CLOSEST DIST AND ANGLE: ", closest_distance, targ_angle)
+        if closest_distance <= self.safety_distance and angle_within_range(observation_range, target_angle=targ_angle):
             self.histogram = np.ones(int(360 / self.alpha))  # set as 1
 
     def get_histogram(self) -> np.array:

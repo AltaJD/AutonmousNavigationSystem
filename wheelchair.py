@@ -10,6 +10,23 @@ from lidar import LIDAR
 from common_functions import get_distance, get_angle_difference
 from map import Map
 import config
+# import external module
+import importlib.util
+# import sys
+# spec = importlib.util.spec_from_file_location("move_init.py", "/home/aims/Desktop/Alisher/move_init.py")
+# mi = importlib.util.module_from_spec(spec)
+# sys.modules["move_init.py"] = mi
+# spec.loader.exec_module(mi)
+
+import importlib.util
+path = "/home/aims/Desktop/Alisher/move_init.py"
+mod_name = "move_init"
+
+mod_spec = importlib.util.spec_from_file_location(mod_name, path)
+
+mi = importlib.util.module_from_spec(mod_spec)
+
+mod_spec.loader.exec_module(mi)
 
 
 class WheelchairStatus(Enum):
@@ -67,10 +84,12 @@ class IntelligentWheelchair:
 
     def stop(self) -> None:
         self.status = WheelchairStatus.WAITING.value
+        # mi.move_stop()
         # TODO: make proper emergency stop hardware call
 
     def emergency_stop(self) -> None:
         self.status = WheelchairStatus.INTERRUPTED.value
+        # mi.move_stop()
         # TODO: make proper emergency emergency hardware call
 
     def show_current_position(self) -> None:
@@ -87,7 +106,7 @@ class IntelligentWheelchair:
         self.status = WheelchairStatus.MOVING.value
         # TODO: add hardware communication
         print("STATUS: ", self.status)
-        self.stop()
+        # mi.move_forward()
         pass
 
     def rotate(self, angle: float) -> None:
@@ -97,8 +116,11 @@ class IntelligentWheelchair:
               f"DIFF: {angle}\t"
               f"DIRECTION: {self.status}")
         # TODO: add hardware communication
-        # self.stop()
-        pass
+        # if self.status == "right":
+        #     mi.move_right()
+        # elif self.status == "left":
+        #     mi.move_left()
+        # pass
 
     def move_to(self, direction_angle: float, distance: float) -> None:
         """ The function to communicate with the hardware control
@@ -199,6 +221,7 @@ class IntelligentWheelchairSim:
             self.current_angle = float(angle)
             self.lidar_sim.current_angle = float(angle)
             if distance < distance_tolerance:
+                self.stop()
                 break
             """ Show the result """
             print(f"Current location:\t {self.current_position}\n"
