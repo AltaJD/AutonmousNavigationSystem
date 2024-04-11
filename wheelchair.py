@@ -12,21 +12,15 @@ from map import Map
 import config
 # import external module
 import importlib.util
-# import sys
-# spec = importlib.util.spec_from_file_location("move_init.py", "/home/aims/Desktop/Alisher/move_init.py")
-# mi = importlib.util.module_from_spec(spec)
-# sys.modules["move_init.py"] = mi
-# spec.loader.exec_module(mi)
-
-import importlib.util
-path = "/home/aims/Desktop/Alisher/move_init.py"
-mod_name = "move_init"
-
-mod_spec = importlib.util.spec_from_file_location(mod_name, path)
-
-mi = importlib.util.module_from_spec(mod_spec)
-
-mod_spec.loader.exec_module(mi)
+path = config.get("path_movement_control_module")
+# TODO: remove after testing
+# mod_name = "move_init"
+#
+# mod_spec = importlib.util.spec_from_file_location(mod_name, path)
+#
+# mi = importlib.util.module_from_spec(mod_spec)
+#
+# mod_spec.loader.exec_module(mi)
 
 
 class WheelchairStatus(Enum):
