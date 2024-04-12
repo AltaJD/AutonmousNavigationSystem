@@ -13,7 +13,6 @@ import config
 # import external module
 import importlib.util
 path = config.get("path_movement_control_module")
-# TODO: remove after testing
 # mod_name = "move_init"
 #
 # mod_spec = importlib.util.spec_from_file_location(mod_name, path)

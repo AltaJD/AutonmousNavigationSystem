@@ -32,7 +32,8 @@ class AutonomousNavigationProgram:
         vfh = VFH(b=config.get('b'),
                   alpha=config.get('sector_angle'),
                   l_param=config.get('l'),
-                  safety_distance=config.get('safety_distance'))
+                  safety_distance=config.get('safety_distance'),
+                  keep_images=self.show_histogram)
         env_map = Map()
         env_map.load_grid(config.get('grid_save'), dtype=np.int8)
         env_map.load_skeleton(config.get('skeleton_save'), dtype=np.int8)
@@ -47,7 +48,9 @@ class AutonomousNavigationProgram:
 
         emergency_stop: bool = wheelchair.status == WheelchairStatus.INTERRUPTED.value
 
-        while self.interrupt_program and not emergency_stop:
+        while not emergency_stop:
+            if self.interrupt_program:
+                break
             # Recv data
             data, addr = sock.recvfrom(10000)
             # print(f"Received data from {addr[0]}:{addr[1]}")
@@ -149,7 +152,7 @@ autonomous_navigation_program = AutonomousNavigationProgram()
 
 
 def start_testing_run():
-    autonomous_navigation_program.testing_run()  # select the method to run
+    autonomous_navigation_program.run()  # select the method to run
 
 
 # Create a thread and start it
@@ -168,7 +171,7 @@ def interrupt_program():
 if __name__ == '__main__':
     start_time = time.time()
     start_program()
-    time.sleep(1)  # 2 seconds
+    time.sleep(3)  # 2 seconds
     interrupt_program()
     print(f"Program stopped after: {time.time()-start_time} seconds")
 

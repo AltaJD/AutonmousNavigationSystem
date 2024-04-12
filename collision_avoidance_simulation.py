@@ -21,7 +21,7 @@ class VFH:
     alpha: int
     l: int
 
-    def __init__(self, safety_distance: float, b, alpha, l_param, a=None):
+    def __init__(self, safety_distance: float, b, alpha, l_param, a=None, keep_images=False):
         """
         Sets the parameters for the VFH generation
         :param safety_distance: min distance to the obstacle in m (0.1 = 10 cm)
@@ -40,10 +40,11 @@ class VFH:
         self.measurements = []
         self.histogram = np.zeros(int(360 / self.alpha))  # by default it contains only zeros
         # set up figure instance
-        fig, (ax1, ax2) = plt.subplots(2, 1)
-        self.fig = fig
-        self.ax1 = ax1
-        self.ax2 = ax2
+        if keep_images:
+            fig, (ax1, ax2) = plt.subplots(2, 1)
+            self.fig = fig
+            self.ax1 = ax1
+            self.ax2 = ax2
 
     def update_measurements(self, values: List[tuple]):
         self.measurements = values

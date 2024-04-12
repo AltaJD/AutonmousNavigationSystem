@@ -4,4 +4,3 @@ pandas>=1.1.5
 scikit-image>=0.17.2
 tqdm>=4.64.1
 PyYAML>=6.0.1
-pyqtgraph>=0.11.1
