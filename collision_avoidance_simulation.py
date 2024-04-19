@@ -18,6 +18,7 @@ class VFH:
     steering_direction: int
     a: float
     b: float
+    c: int  # certainty value
     alpha: int
     l: int
 
@@ -35,6 +36,7 @@ class VFH:
         self.alpha = alpha
         self.a = a
         self.b = b
+        self.c = 1
         self.l = l_param
         self.free_sectors_num = [(0, 0.0)]  # [(num_of_sectors, time_in_ms)]
         self.measurements = []
@@ -100,8 +102,7 @@ class VFH:
 
     def get_magnitude(self, d: float) -> float:
         # d represents distance to the obstacle
-        c: float = d + 1  # certainty value
-        m: float = (c ** 2) * (self.a - self.b * d)  # magnitude
+        m: float = (self.c ** 2) * (self.a - self.b * d)  # magnitude
         if m < 0:
             m = 0
         assert m >= 0, "Magnitude is a negative number"
@@ -120,11 +121,12 @@ class VFH:
             angle: float = self.measurements[i][0]  # radians
             angle = convert_to_degrees(angle)  # degrees
             distance: float = self.measurements[i][1]  # meters
-            if distance <= self.safety_distance:
-                m = self.get_magnitude(highest_distance)  # set max probability to avoid it
-            else:
-                m = self.get_magnitude(distance)
             sector: int = round(np.floor(angle / self.alpha))
+            if self.histogram[sector] != 0:
+                self.c += 1
+            else:
+                self.c = 1  # reset to 1
+            m = self.get_magnitude(distance)
             self.histogram[sector] += m
 
     def neglect_angles(self, angles: tuple, overflow: bool) -> None:
