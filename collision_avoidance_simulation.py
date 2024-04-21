@@ -95,7 +95,6 @@ class VFH:
         self.desired_direction = desired_angle
         minimums_diff = list(map(lambda x: abs(x - desired_angle), obstacle_free_sectors))
         best_angle = obstacle_free_sectors[minimums_diff.index(min(minimums_diff))]
-        # convert angle to degrees
         best_angle *= config.get('sector_angle')
         self.steering_direction = best_angle
         return best_angle
@@ -187,7 +186,7 @@ class VFH:
         def angle_within_range(angles: list, target_angle: int) -> bool:
             normalized_angle = target_angle % 360
             if angles[0] <= normalized_angle <= angles[1]:
-                print('WITHIN RANGE !!!!!!!!!!!!!!!!!!!!!!!!!!')
+                print('Obstacle is too close !!!!!!!!!!!!!!!!!!!!!!!!!!')
                 return True
             return False
 
@@ -201,7 +200,6 @@ class VFH:
             return result
 
         closest_distance, targ_angle = get_lowest_dist_tuple()
-        print("CLOSEST DIST AND ANGLE: ", closest_distance, targ_angle)
         if closest_distance <= self.safety_distance and angle_within_range(observation_range, target_angle=targ_angle):
             self.histogram = np.ones(int(360 / self.alpha))  # set as 1
 
