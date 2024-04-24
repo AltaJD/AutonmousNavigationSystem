@@ -292,7 +292,7 @@ class VFH:
         if target_node is not None:
             plt.plot(target_node[1], target_node[0], 'gx')
             # show 0 angle vector
-            plt.quiver(current_node[1], current_node[0], sin(0) * 1, cos(0) * 1, color='r')
+            # plt.quiver(current_node[1], current_node[0], sin(0) * 1, cos(0) * 1, color='r')
             # show the steering direction
             plt.quiver(current_node[1], current_node[0],
                        sin(np.radians(self.steering_direction)),

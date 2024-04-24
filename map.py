@@ -286,7 +286,7 @@ class Map:
         self.create_skeleton()
         self.normalize_grid()
 
-    def add_obstacles(self, n: int) -> None:
+    def add_random_obstacles(self, n: int) -> None:
         """ The function add the obstacle locations to the main map
         and save the new map to the csv file.
         It allows to test the obstacle avoidance system and A* algorithm,
@@ -310,10 +310,14 @@ class Map:
             x, y = coord[0], coord[1]
             if x + 1 >= x_offset or y + 1 >= y_offset:
                 continue
-            self.grid[(x + 1, y + 1)] = 1
-            self.grid[(x + 1, y)] = 1
-            self.grid[(x, y + 1)] = 1
-            self.grid[(x, y)] = 1
+            self.add_obstacle_at(coord, w=1)
+
+    def add_obstacle_at(self, coordinate: tuple, w: int):
+        x, y = coordinate
+        self.grid[(x + w, y + w)] = 1
+        self.grid[(x + w, y)] = 1
+        self.grid[(x, y + w)] = 1
+        self.grid[(x, y)] = 1
 
     def get_island_coordinates(self, seed_point, threshold) -> np.array:
         # Create a mask to store the regions where the algorithm has expanded

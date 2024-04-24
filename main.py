@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from lidar import LIDAR
 from collision_avoidance_simulation import VFH
 from wheelchair import IntelligentWheelchairSim, IntelligentWheelchair, WheelchairStatus
@@ -114,6 +116,8 @@ class AutonomousNavigationProgram:
         start = env_map.select_start()
         end = env_map.select_end()
         env_map.create_path(start, end)
+        obstacle_coordinates = env_map.select_point(title="Add obstacle")
+        env_map.add_obstacle_at(obstacle_coordinates, w=1)
         env_map.show_path()
 
         # prepare LIDAR
@@ -136,18 +140,19 @@ class AutonomousNavigationProgram:
         path = env_map.path
         print('Path Length: ', len(path.waypoints)*config.get('map_density'))
         path_taken = []
-        # for coord in path.waypoints:
-        #     intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=False)
-        #     path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
-        #     if intel_wheelchair.status == WheelchairStatus.INTERRUPTED.value:
-        #         break
-        #
-        # """ Visualizing path taken by the simulation """
-        # print("=== REACHED DESTINATION ===")
+        for coord in path.waypoints:
+            intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=True)
+            path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
+            if intel_wheelchair.status == WheelchairStatus.INTERRUPTED.value:
+                break
+
+        """ Visualizing path taken by the simulation """
+        print("=== REACHED DESTINATION ===")
         # vfh.ax2.remove()
         # vfh.ax1.remove()
         # env_map.path.waypoints = np.array(path_taken)  # change the generated path to path taken
         # env_map.show_path()  # show path taken
+        plt.show()
 
 
 autonomous_navigation_program = AutonomousNavigationProgram()
