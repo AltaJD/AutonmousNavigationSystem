@@ -109,8 +109,8 @@ class AutonomousNavigationProgram:
 
         # prepare Map
         env_map = Map(map_image_size=10)
-        env_map.load_grid(config.get('grid_save'), dtype=np.int)
-        env_map.load_skeleton(config.get('skeleton_save'), dtype=np.int)
+        env_map.load_grid(config.get('lab_grid_save'), dtype=np.int)
+        env_map.create_skeleton()
         start = env_map.select_start()
         end = env_map.select_end()
         env_map.create_path(start, end)
@@ -123,7 +123,8 @@ class AutonomousNavigationProgram:
         vfh = VFH(b=config.get('b'),
                   alpha=config.get('sector_angle'),
                   l_param=config.get('l'),
-                  safety_distance=config.get('safety_distance'))
+                  safety_distance=config.get('safety_distance'),
+                  keep_images=True)
         vfh.update_measurements(lidar_simulation.get_values())
 
         # create Wheelchair
@@ -133,19 +134,20 @@ class AutonomousNavigationProgram:
                                                     env=env_map)
 
         path = env_map.path
+        print('Path Length: ', len(path.waypoints)*config.get('map_density'))
         path_taken = []
-        for coord in path.waypoints:
-            intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=False)
-            path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
-            if intel_wheelchair.status == WheelchairStatus.INTERRUPTED.value:
-                break
-
-        """ Visualizing path taken by the simulation """
-        print("=== REACHED DESTINATION ===")
-        vfh.ax2.remove()
-        vfh.ax1.remove()
-        env_map.path.waypoints = np.array(path_taken)  # change the generated path to path taken
-        env_map.show_path()  # show path taken
+        # for coord in path.waypoints:
+        #     intel_wheelchair.move_to(target_node=coord, vfh=vfh, show_map=False)
+        #     path_taken.append([intel_wheelchair.current_position[0], intel_wheelchair.current_position[1]])
+        #     if intel_wheelchair.status == WheelchairStatus.INTERRUPTED.value:
+        #         break
+        #
+        # """ Visualizing path taken by the simulation """
+        # print("=== REACHED DESTINATION ===")
+        # vfh.ax2.remove()
+        # vfh.ax1.remove()
+        # env_map.path.waypoints = np.array(path_taken)  # change the generated path to path taken
+        # env_map.show_path()  # show path taken
 
 
 autonomous_navigation_program = AutonomousNavigationProgram()
@@ -169,9 +171,10 @@ def interrupt_program():
 
 
 if __name__ == '__main__':
-    start_time = time.time()
-    start_program()
-    time.sleep(3)  # 2 seconds
-    interrupt_program()
-    print(f"Program stopped after: {time.time()-start_time} seconds")
+    # start_time = time.time()
+    # start_program()
+    # time.sleep(3)  # 2 seconds
+    # interrupt_program()
+    # print(f"Program stopped after: {time.time()-start_time} seconds")
+    autonomous_navigation_program.run_simulation()
 

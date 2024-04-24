@@ -55,8 +55,6 @@ class LidarSimulation:
             delta = self.end_blind_spot - self.start_blind_spot
         else:
             delta = (360 - self.end_blind_spot) + self.start_blind_spot
-        print("OLD Blind spot: ", self.start_blind_spot, self.end_blind_spot)
-        print(self.blind_spot_overflow)
         self.end_blind_spot += self.current_angle
         if self.end_blind_spot < 0:
             self.end_blind_spot += 360
@@ -75,8 +73,6 @@ class LidarSimulation:
             self.blind_spot_overflow = True
         else:
             self.blind_spot_overflow = False
-        print("New Blind spot: ", self.start_blind_spot, self.end_blind_spot)
-        print(self.blind_spot_overflow)
 
     def swap_blind_spot_range(self) -> None:
         var = self.end_blind_spot

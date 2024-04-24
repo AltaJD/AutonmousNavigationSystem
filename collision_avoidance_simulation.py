@@ -40,7 +40,7 @@ class VFH:
         self.l = l_param
         self.free_sectors_num = [(0, 0.0)]  # [(num_of_sectors, time_in_ms)]
         self.measurements = []
-        self.histogram = np.zeros(int(360 / self.alpha))  # by default it contains only zeros
+        self.histogram = np.zeros(int(360 / self.alpha), dtype=np.float)  # by default, it contains only zeros
         # set up figure instance
         if keep_images:
             fig, (ax1, ax2) = plt.subplots(2, 1)
@@ -105,7 +105,7 @@ class VFH:
         if m < 0:
             m = 0
         assert m >= 0, "Magnitude is a negative number"
-        return m
+        return round(m, 2)
 
     def fill_histogram(self) -> None:
         """ Array is filled according to the angle sector """
@@ -114,8 +114,7 @@ class VFH:
             return None
         highest_distance = max(self.measurements, key=lambda x: x[1])[1]
         assert highest_distance > 0, "HIGHEST DISTANCE IS 0"
-        if self.a is None:
-            self.a = self.b * highest_distance
+        self.a = self.b * highest_distance
         for i in range(len(self.measurements)):
             angle: float = self.measurements[i][0]  # radians
             angle = convert_to_degrees(angle)  # degrees
@@ -126,7 +125,12 @@ class VFH:
             else:
                 self.c = 1  # reset to 1
             m = self.get_magnitude(distance)
-            self.histogram[sector] += m
+            self.histogram[sector] = round(self.histogram[sector] + np.float(m), 2)
+            # print("M:", m)
+            # print("Value: ", self.histogram[sector] + np.float(m))
+            debug = list(np.where(self.histogram < 0))
+            # print(debug[0])
+            assert len(debug[0]) == 0, f"Overflow detected:\n{self.histogram}"
 
     def neglect_angles(self, angles: tuple, overflow: bool) -> None:
         """ The function set probability of 1 (max) to the sectors, which should be automatically neglected
@@ -170,6 +174,7 @@ class VFH:
         """
         self.empty_histogram()
         self.fill_histogram()
+        self.normalize_histogram()
         self.smooth_histogram(l=self.l)
         self.normalize_histogram()
         if blind_spot_range is not None and type(blind_spot_range) == tuple:
@@ -218,14 +223,15 @@ class VFH:
         For this system, l is a tolerance for steering direction
         :returns: smoothed polar obstacle density as List[float]
         """
-        hist = np.array(self.histogram, dtype=int)
+        hist = self.histogram
         smoothed_data = []
         # cumulative = 0 # cumulative sum
         for i in range(len(hist)):
             start_index = max(0, i - l + 1)
             end_index = min(len(hist), i + l)
-            window = hist[start_index:end_index]
-            smoothed_value = sum(window) / len(window)
+            window = np.array(hist[start_index:end_index], dtype=np.float)
+            smoothed_value = np.sum(window) / len(window)
+            assert smoothed_value >= 0, "The value is negative"
             smoothed_data.append(smoothed_value)
         self.histogram = smoothed_data
 
